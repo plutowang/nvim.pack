@@ -1,0 +1,13 @@
+tags
+test.sh
+.luarc.json
+
+spell/
+lazy-lock.json
+*.DS_Store
+.idea
+.zig-cache
+zig-out/
+.opencode/*
+!.opencode/skills/
+tmp/
