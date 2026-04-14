@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .zlap = .{
-            .url = "https://github.com/plutowang/zlap/archive/v0.0.2-beta.tar.gz",
-            .hash = "zlap-0.0.2-beta-eNQqnN7CAACi6ca9Z4gRcUhRwlfkOB0AiXPoUbrfMrr7",
+            .url = "https://github.com/plutowang/zlap/archive/v0.0.3-beta.tar.gz",
+            .hash = "zlap-0.0.3-beta-eNQqnOLGAABfCEn-F7mFFVol1IOcD_E53XkquhtXg5Df",
         },
     },
     .paths = .{
