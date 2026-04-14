@@ -44,7 +44,7 @@ nvim.pack/
 │       ├── tools.lua        # testing, database, diagnostics, productivity
 │       ├── treesitter.lua   # TS core, context, textobjects
 │       └── ui.lua           # which-key, native snacks replacements (terminal/lazygit/bufdelete/scratch), bigfile, quickfile
-└── eval_startuptime.zig     # Startup benchmark tool
+└── nvim-pack-lock.json      # Plugin version lock file
 ```
 
 ## Loading Engine
@@ -80,16 +80,42 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 | **Keymap**         | On first keypress        | Telescope, DAP, testing, database, diffview, trouble, productivity, surround, grug-far, treesj |
 | **Deferred**       | After 1ms idle           | render-markdown, colorizer, guess-indent, todo-comments |
 
-## Quick Start
+## CLI Tool
 
-### 1. Symlink the config
+The `nvim-pack` binary provides two commands:
+
+### `nvim-pack link`
+
+Link configuration resources to `~/.config/nvim/` as individual symlinks:
 
 ```bash
-# Option A: Direct symlink (replaces existing config)
-ln -sf ~/projects/personal/term.conf/nvim.pack ~/.config/nvim
+nvim-pack link           # Link all resources (init.lua, lua/, nvim-pack-lock.json)
+nvim-pack link --dry-run # Preview changes without executing
+```
 
-# Option B: Isolated via NVIM_APPNAME (keeps existing config)
-NVIM_APPNAME=nvim.pack nvim
+### `nvim-pack bench`
+
+Benchmark Neovim startup time:
+
+```bash
+nvim-pack bench                        # Default: 30 iterations, 200ms settle
+nvim-pack bench --iterations 50        # More iterations
+nvim-pack bench --top 20               # Show top 20 slowest sources
+nvim-pack bench --file /path/to/file   # Open a specific file
+```
+
+Thresholds: ≤50ms EXCELLENT, ≤80ms GOOD, ≤120ms FAIR, >120ms SLOW
+
+## Quick Start
+
+### 1. Install the config
+
+```bash
+# Option A: Use nvim-pack CLI (recommended)
+nvim-pack link
+
+# Option B: Clone directly
+git clone https://github.com/plutowang/nvim.pack.git ~/.config/nvim
 ```
 
 ### 2. First launch
@@ -156,27 +182,6 @@ Mason auto-installs LSP servers, but some servers need language runtimes:
 3. **Remove from disk**: Delete the plugin directory from `~/.local/share/nvim/site/pack/core/opt/<PluginName>`.
 4. **Clean the lock file** (optional but recommended): Remove the plugin entry from `nvim-pack-lock.json` to keep it in sync. If `vim.pack` auto-repairs it back on next startup, the plugin directory still exists on disk — remove that first, then the lock entry will stay removed.
 
-## Verification & Debugging
-
-```bash
-# Syntax check all Lua files
-luac -p nvim.pack/lua/**/*.lua
-
-# Headless startup (must exit cleanly with code 0)
-nvim --headless +quit; echo $?
-
-# Startup benchmark (covers immediate + VimEnter + BufReadPre + UIEnter plugins)
-cd nvim.pack && zig run eval_startuptime.zig
-# Options: --file <path> --iterations <n> --warmup <n> --settle <ms> --top <n>
-# Thresholds: <=50ms EXCELLENT, <=80ms GOOD, <=120ms FAIR, >120ms SLOW
-
-# Inside Neovim: check loaded modules
-:lua print(vim.inspect(require('core.pack').loaded()))
-
-# Inside Neovim: run healthcheck
-:checkhealth
-```
-
 ## Known Pitfalls
 
 1. **`packadd` Dependencies**: If a plugin requires another plugin to function, you MUST include the dependency in the `packadd` array of the registry entry.
@@ -187,37 +192,6 @@ cd nvim.pack && zig run eval_startuptime.zig
 
 ## Troubleshooting
 
-### nvim-treesitter `master` vs `main` Branch (CRITICAL)
-
-The `master` branch of `nvim-treesitter` is a **legacy rewrite** incompatible with Neovim 0.12+. This configuration uses the **`main` branch** (a complete ground-up rewrite).
-
-**`master` branch bug — Shift+K (LSP hover) crash**: The `master` branch ships a `query_predicates.lua` that crashes Neovim when LSP hover opens a markdown float buffer.
-
-**Fix**: Switch to the `main` branch:
-```bash
-git -C ~/.local/share/nvim/site/pack/core/opt/nvim-treesitter checkout main
-```
-
-### The `lazy.nvim` Ghost Symlink Bug (No Highlighting)
-
-If migrating from `lazy.nvim`, broken symlinks in `~/.local/share/nvim/site/queries/` can prevent Treesitter highlighting.
-
-**Fix**:
-```bash
-rm -rf ~/.local/share/nvim/site/queries
-rm -rf ~/.local/share/nvim/site/parser
-# Open Neovim to trigger auto-install
-nvim
-```
-
-### LSP Log Growing Too Large
-
-The config automatically truncates the LSP log file on `VimEnter` if it exceeds 10 MB. If you need to manually clear it:
-
-```vim
-:lua vim.fn.delete(vim.lsp.log.get_filename())
-```
-
 ### blink.cmp "No fuzzy matching Library found"
 
 This error appears when the Rust fuzzy library hasn't been compiled. blink.cmp's error message references `lazy.nvim` (its most common plugin manager), but the fix is the same regardless of plugin manager:
@@ -227,19 +201,3 @@ cd ~/.local/share/nvim/site/pack/core/opt/blink.cmp && cargo build --release
 ```
 
 The `PackChanged` autocmd runs this automatically on install/update. If you don't have `cargo` installed, the config falls back to the Lua fuzzy implementation via `fuzzy.implementation = 'prefer_rust'` in `lua/plugins/completion.lua`. To force Lua-only matching, change it to `'lua'`.
-
-## TODO: LSP Server Dynamic Configuration
-
-`vim.lsp.config` does not support `on_new_config` (a `nvim-lspconfig`-specific feature). Dynamic per-project configuration is achieved via `root_dir` as a function, which calls `vim.lsp.config()` to update `cmd` before the server starts. **Limitation**: in multi-project workspaces, the last opened project wins for `cmd` updates.
-
-### Implemented
-
-- **angularls**: Uses `root_dir` function to dynamically set `--tsProbeLocations`, `--ngProbeLocations`, and `--angularCoreVersion` based on project `node_modules` and `package.json`. Falls back to Mason package's `node_modules`.
-
-### Not Yet Implemented
-
-- **astro**: Sets `init_options.typescript.tsdk` from project TypeScript installation.
-- **tailwindcss**: Complex `root_dir` function that checks for Tailwind config files and `tailwindcss` in `package.json`.
-- **zls**: Adds `--config-path` flag when `zls.json` exists in the project root.
-
-To implement these, add a `root_dir` function to the relevant server entry in `lua/plugins/lsp.lua`. See the `nvim-lspconfig` repository's `lsp/` directory for reference implementations.
