@@ -1,0 +1,17 @@
+.{
+    .name = .nvim_pack,
+    .version = "0.1.0",
+    .fingerprint = 0xbe0a1a18f778ced2,
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .zlap = .{
+            .url = "https://github.com/plutowang/zlap/archive/v0.0.2-beta.tar.gz",
+            .hash = "zlap-0.0.2-beta-eNQqnN7CAACi6ca9Z4gRcUhRwlfkOB0AiXPoUbrfMrr7",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "cli",
+    },
+}
