@@ -21,15 +21,23 @@ vim.api.nvim_create_autocmd('LspAttach', {
       vim.keymap.set(mode, keys, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
     end
 
+    -- Delegates to telescope.lua's idempotent M.setup() for lazy loading.
+    local function telescope_builtin(fn_name)
+      return function()
+        require('plugins.telescope').setup()
+        require('telescope.builtin')[fn_name]()
+      end
+    end
+
     map('grn', vim.lsp.buf.rename, '[R]e[n]ame')
     map('gra', vim.lsp.buf.code_action, '[G]oto Code [A]ction', { 'n', 'x' })
-    map('grr', function() require('telescope.builtin').lsp_references() end, '[G]oto [R]eferences')
-    map('gri', function() require('telescope.builtin').lsp_implementations() end, '[G]oto [I]mplementation')
-    map('grd', function() require('telescope.builtin').lsp_definitions() end, '[G]oto [D]efinition')
+    map('grr', telescope_builtin('lsp_references'), '[G]oto [R]eferences')
+    map('gri', telescope_builtin('lsp_implementations'), '[G]oto [I]mplementation')
+    map('grd', telescope_builtin('lsp_definitions'), '[G]oto [D]efinition')
     map('grD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-    map('gO', function() require('telescope.builtin').lsp_document_symbols() end, 'Open Document Symbols')
-    map('gW', function() require('telescope.builtin').lsp_dynamic_workspace_symbols() end, 'Open Workspace Symbols')
-    map('grt', function() require('telescope.builtin').lsp_type_definitions() end, '[G]oto [T]ype Definition')
+    map('gO', telescope_builtin('lsp_document_symbols'), 'Open Document Symbols')
+    map('gW', telescope_builtin('lsp_dynamic_workspace_symbols'), 'Open Workspace Symbols')
+    map('grt', telescope_builtin('lsp_type_definitions'), '[G]oto [T]ype Definition')
 
     local function client_supports_method(client, method, bufnr)
       if vim.fn.has('nvim-0.11') == 1 then

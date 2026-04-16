@@ -2,9 +2,13 @@
 
 local M = {}
 
---- Load ui-select early (on UIEnter) so vim.ui.select is overridden before
---- LSP keymaps like `gra` fire. Full telescope setup happens on first keypress.
-function M.ui_select()
+--- Singleton: packadd plenary+telescope and run telescope.setup exactly once.
+local setup_done = false
+local function ensure_setup()
+  if setup_done then return end
+  setup_done = true
+  vim.cmd.packadd('plenary.nvim')
+  vim.cmd.packadd('telescope.nvim')
   require('telescope').setup {
     defaults = {
       preview = {
@@ -17,14 +21,29 @@ function M.ui_select()
       },
     },
   }
-  pcall(require('telescope').load_extension, 'ui-select')
 end
 
---- Full telescope setup: fzf extension + keymaps. Triggered on first <leader>s* keypress.
-function M.setup()
-  -- Load fzf extension (setup already done in M.ui_select, but idempotent)
-  pcall(require('telescope').load_extension, 'fzf')
+--- Lazy vim.ui.select override: loads telescope on first call (e.g. LSP code action).
+function M.ui_select()
+  local original_select = vim.ui.select
+  vim.ui.select = function(items, opts, on_choice)
+    -- Restore original first to prevent recursion if loading fails
+    vim.ui.select = original_select
+    ensure_setup()
+    vim.cmd.packadd('telescope-ui-select.nvim')
+    pcall(require('telescope').load_extension, 'ui-select')
+    vim.ui.select(items, opts, on_choice)
+  end
+end
 
+--- Full setup: fzf extension + keymaps. Idempotent — safe to call from LSP keymaps.
+local keymaps_registered = false
+function M.setup()
+  ensure_setup()
+  if keymaps_registered then return end
+  keymaps_registered = true
+  vim.cmd.packadd('telescope-fzf-native.nvim')
+  pcall(require('telescope').load_extension, 'fzf')
   -- Custom Multi-Grep function
   local function live_multigrep(opts)
     opts = opts or {}

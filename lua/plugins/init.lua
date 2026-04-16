@@ -147,14 +147,14 @@ pack.setup({
     { 'gS', desc = 'Split node under cursor' },
     { 'gJ', desc = 'Join node under cursor' },
   }, packadd = { 'treesj' } },
-  -- Load ui-select early so vim.ui.select is overridden before LSP keymaps (gra, grd, etc.)
-  { mod = 'telescope',  fn = 'ui_select', event = 'UIEnter', packadd = { 'telescope.nvim', 'telescope-ui-select.nvim', 'plenary.nvim' } },
+  -- Wire lazy vim.ui.select override on UIEnter (no packadd — telescope loads on first call)
+  { mod = 'telescope',  fn = 'ui_select', event = 'UIEnter' },
 
   -- -------------------------------------------------------------------------
   -- BufReadPre / BufNewFile (core file-level features)
   -- -------------------------------------------------------------------------
   { mod = 'treesitter', fn = 'base',    event = { 'BufReadPre', 'BufNewFile' }, packadd = { 'nvim-treesitter' } },
-  { mod = 'lsp',                        event = { 'BufReadPre', 'BufNewFile' }, packadd = { 'mason.nvim', 'mason-tool-installer.nvim', 'lazydev.nvim', 'telescope.nvim', 'plenary.nvim' } },
+  { mod = 'lsp',                        event = { 'BufReadPre', 'BufNewFile' }, packadd = { 'mason.nvim', 'mason-tool-installer.nvim', 'lazydev.nvim' } },
   { mod = 'lsp', fn = 'rustacean',      event = { 'BufReadPre', 'BufNewFile' }, pattern = { '*.rs' }, packadd = { 'rustaceanvim' } },
   { mod = 'git',        fn = 'signs',   event = { 'BufReadPre', 'BufNewFile' }, packadd = { 'gitsigns.nvim', 'plenary.nvim' } },
   { mod = 'treesitter', fn = 'context', event = { 'BufReadPre', 'BufNewFile' }, packadd = { 'nvim-treesitter-context', 'nvim-treesitter-textobjects' } },
@@ -187,7 +187,7 @@ pack.setup({
       { '<leader>s/',   desc = 'Search in Open Files' },
       { '<leader><leader>', desc = 'Find Buffers' },
       { '<leader>/',     desc = 'Fuzzy Buffer' },
-    }, packadd = { 'telescope.nvim', 'telescope-fzf-native.nvim', 'telescope-ui-select.nvim', 'plenary.nvim' } },
+    } },
 
   { mod = 'debugging', keys = {
       { '<F5>',   desc = 'Debug Continue' },
