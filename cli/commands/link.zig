@@ -1,6 +1,10 @@
 const std = @import("std");
+const fs = std.fs;
+const Io = std.Io;
+
 const zlap = @import("zlap");
 const symlink = @import("../core/symlink.zig");
+const context = @import("../core/context.zig");
 
 /// Resource definition: a file or directory in the project root to link into ~/.config/nvim/.
 const Resource = struct {
@@ -18,6 +22,7 @@ const RESOURCES = [_]Resource{
 
 pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     const allocator = parser.allocator;
+    const io = context.init.io;
     const dry_run = parser.getFlag("dry-run");
 
     if (dry_run) {
@@ -28,37 +33,39 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     parser.logger.info("Starting nvim.pack link setup...", .{});
     std.debug.print("\n", .{});
 
-    const home_dir = std.posix.getenv("HOME") orelse {
-        parser.logger.err("HOME environment variable not set", .{});
+    const home_dir = context.init.environ_map.get("HOME") orelse {
+        parser.logger.err("Error: HOME environment variable not set", .{});
         return;
     };
 
     // Determine the project root directory (current working directory)
-    const base_dir = std.fs.cwd().realpathAlloc(allocator, ".") catch |err| {
+    const base_dir = std.process.currentPathAlloc(io, allocator) catch |err| {
         parser.logger.err("Failed to get current directory: {}", .{err});
         return;
     };
     defer allocator.free(base_dir);
 
     // Verify that the required resources exist in the project root
-    verifyResources(base_dir, allocator) catch {
+    verifyResources(io, base_dir, allocator) catch {
         parser.logger.err("Please run this program from the nvim.pack directory or install it properly", .{});
         return;
     };
 
-    const nvim_config_path = try std.fs.path.join(allocator, &[_][]const u8{ home_dir, ".config", "nvim" });
+    const nvim_config_path = try fs.path.join(allocator, &.{ home_dir, ".config", "nvim" });
     defer allocator.free(nvim_config_path);
 
     // Handle the three cases for ~/.config/nvim
     if (dry_run) {
         // In dry-run mode, just report what would happen
-        var link_buffer: [std.fs.max_path_bytes]u8 = undefined;
-        const existing = std.fs.cwd().readLink(nvim_config_path, &link_buffer);
-        if (existing) |target| {
+        var link_buffer: [fs.max_path_bytes]u8 = undefined;
+        const work_dir = Io.Dir.cwd();
+        const existing = work_dir.readLink(io, nvim_config_path, &link_buffer);
+        if (existing) |len| {
+            const target = link_buffer[0..len];
             parser.logger.info("Would replace symlink: {s} -> {s}", .{ nvim_config_path, target });
             parser.logger.info("Would create directory: {s}", .{nvim_config_path});
         } else |_| {
-            const dir_accessible = std.fs.cwd().access(nvim_config_path, .{}) catch null;
+            const dir_accessible = work_dir.access(io, nvim_config_path, .{}) catch null;
             if (dir_accessible != null) {
                 parser.logger.info("Would backup existing directory: {s}", .{nvim_config_path});
             } else {
@@ -67,9 +74,9 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
         }
 
         for (RESOURCES) |resource| {
-            const source_path = try std.fs.path.join(allocator, &[_][]const u8{ base_dir, resource.source });
+            const source_path = try fs.path.join(allocator, &.{ base_dir, resource.source });
             defer allocator.free(source_path);
-            const target_path = try std.fs.path.join(allocator, &[_][]const u8{ nvim_config_path, resource.source });
+            const target_path = try fs.path.join(allocator, &.{ nvim_config_path, resource.source });
             defer allocator.free(target_path);
 
             parser.logger.info("Would link: {s} -> {s}", .{ target_path, source_path });
@@ -80,51 +87,44 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     }
 
     // Ensure ~/.config/nvim is a real directory (handle symlink/backup cases)
-    const replaced_symlink = symlink.ensureRealDirectory(nvim_config_path, parser.logger) catch |err| {
+    const replaced_symlink = symlink.ensureRealDirectory(io, nvim_config_path, parser.logger) catch |err| {
         parser.logger.err("Failed to prepare ~/.config/nvim: {}", .{err});
         return;
     };
 
     // Safety verification: confirm ~/.config/nvim is now a real directory (not a symlink).
-    // This prevents operating through a symlinked parent, which could corrupt files
-    // in the symlink target directory.
-    const is_real_dir = symlink.verifyIsRealDirectory(nvim_config_path) catch |err| {
+    const is_real_dir = symlink.verifyIsRealDirectory(io, nvim_config_path) catch |err| {
         parser.logger.err("~/.config/nvim is not a real directory: {}", .{err});
         parser.logger.err("This usually means ~/.config/nvim is a symlink. Run 'nvim-pack link' again to fix this.", .{});
         return;
     };
     if (!is_real_dir) {
-        // This shouldn't happen after ensureRealDirectory, but handle it defensively
         parser.logger.err("~/.config/nvim does not exist after setup", .{});
         return;
     }
 
     if (replaced_symlink) {
-        // If we replaced a symlink, the old config pointed somewhere else.
-        // The new directory is empty, so we just link resources into it.
         std.debug.print("\n", .{});
     } else {
-        // Check if ~/.config/nvim already had content (it was backed up)
-        // The backup function already logged the backup, so we just continue.
         std.debug.print("\n", .{});
     }
 
     // Link each resource into ~/.config/nvim/
     var success_count: usize = 0;
     for (RESOURCES) |resource| {
-        const source_path = std.fs.path.join(allocator, &[_][]const u8{ base_dir, resource.source }) catch |err| {
+        const source_path = fs.path.join(allocator, &.{ base_dir, resource.source }) catch |err| {
             parser.logger.err("Failed to construct source path: {}", .{err});
             continue;
         };
         defer allocator.free(source_path);
 
-        const target_path = std.fs.path.join(allocator, &[_][]const u8{ nvim_config_path, resource.source }) catch |err| {
+        const target_path = fs.path.join(allocator, &.{ nvim_config_path, resource.source }) catch |err| {
             parser.logger.err("Failed to construct target path: {}", .{err});
             continue;
         };
         defer allocator.free(target_path);
 
-        symlink.createSymlink(source_path, target_path, resource.name, allocator, parser.logger) catch |err| {
+        symlink.createSymlink(io, source_path, target_path, resource.name, allocator, dry_run, parser.logger) catch |err| {
             parser.logger.err("Failed to link {s}: {}", .{ resource.name, err });
             continue;
         };
@@ -140,10 +140,11 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     }
 }
 
-fn verifyResources(base_dir: []const u8, allocator: std.mem.Allocator) !void {
+fn verifyResources(io: Io, base_dir: []const u8, allocator: std.mem.Allocator) !void {
+    const work_dir = Io.Dir.cwd();
     for (RESOURCES) |resource| {
-        const path = try std.fs.path.join(allocator, &[_][]const u8{ base_dir, resource.source });
+        const path = try fs.path.join(allocator, &.{ base_dir, resource.source });
         defer allocator.free(path);
-        try std.fs.cwd().access(path, .{});
+        try work_dir.access(io, path, .{});
     }
 }

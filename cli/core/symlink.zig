@@ -1,28 +1,31 @@
 const std = @import("std");
 const fs = std.fs;
+const Io = std.Io;
+
 const zlap = @import("zlap");
 
 /// Backs up an existing file or directory by renaming it with a timestamp suffix.
 /// Returns true if a backup was made, false if the path didn't exist or was a symlink.
-pub fn backup(file_path: []const u8, allocator: std.mem.Allocator, logger: *zlap.Logger) !bool {
-    const work_dir = fs.cwd();
-    const file = work_dir.openFile(file_path, .{}) catch |err| switch (err) {
+pub fn backup(io: Io, log: *zlap.Logger, allocator: std.mem.Allocator, file_path: []const u8) !bool {
+    const work_dir = Io.Dir.cwd();
+    const file = work_dir.openFile(io, file_path, .{}) catch |err| switch (err) {
         error.FileNotFound => return false,
         else => return err,
     };
-    defer file.close();
+    defer file.close(io);
 
-    const stat = file.stat() catch return false;
+    const stat = file.stat(io) catch return false;
     if (stat.kind == .sym_link) {
         return false;
     }
 
-    const ts = std.time.timestamp();
+    const now = Io.Clock.real.now(io);
+    const ts = now.toNanoseconds();
     const backup_path = try std.fmt.allocPrint(allocator, "{s}.backup.{d}", .{ file_path, ts });
     defer allocator.free(backup_path);
 
-    try work_dir.rename(file_path, backup_path);
-    logger.info("Backed up existing {s} to {s}", .{ file_path, backup_path });
+    try work_dir.rename(file_path, work_dir, backup_path, io);
+    log.info("Backed up existing {s} to {s}", .{ file_path, backup_path });
 
     return true;
 }
@@ -30,12 +33,12 @@ pub fn backup(file_path: []const u8, allocator: std.mem.Allocator, logger: *zlap
 /// Verifies that `dir_path` is a real directory (not a symlink).
 /// Returns `true` if it's a real directory, `false` if it doesn't exist.
 /// Returns an error if the path is a symlink or a regular file.
-pub fn verifyIsRealDirectory(dir_path: []const u8) !bool {
-    const work_dir = fs.cwd();
+pub fn verifyIsRealDirectory(io: Io, dir_path: []const u8) !bool {
+    const work_dir = Io.Dir.cwd();
 
     // Check if the path is a symlink first (readLink does not follow symlinks)
-    var link_buffer: [std.fs.max_path_bytes]u8 = undefined;
-    if (work_dir.readLink(dir_path, &link_buffer)) |_| {
+    var link_buffer: [fs.max_path_bytes]u8 = undefined;
+    if (work_dir.readLink(io, dir_path, &link_buffer)) |_| {
         // It's a symlink — this is unsafe for our use case
         return error.IsSymlink;
     } else |err| switch (err) {
@@ -44,17 +47,17 @@ pub fn verifyIsRealDirectory(dir_path: []const u8) !bool {
     }
 
     // Check if the path exists
-    work_dir.access(dir_path, .{}) catch {
+    work_dir.access(io, dir_path, .{}) catch {
         // Path doesn't exist
         return false;
     };
 
     // Path exists and is not a symlink — verify it's a directory
-    var dir = work_dir.openDir(dir_path, .{}) catch {
+    var dir = work_dir.openDir(io, dir_path, .{}) catch {
         // Exists but can't open as directory — it's a regular file
         return error.NotADirectory;
     };
-    defer dir.close();
+    defer dir.close(io);
 
     return true;
 }
@@ -63,64 +66,65 @@ pub fn verifyIsRealDirectory(dir_path: []const u8) !bool {
 /// If `target_path` already points to `source_path`, reports it as already linked.
 /// If `target_path` is a different symlink, replaces it.
 /// If `target_path` is a regular file/directory, backs it up first.
-///
-/// **Safety guard**: Before performing any destructive operation (backup, delete, symlink),
-/// this function verifies that the target path's parent directory is a real directory
-/// (not a symlink). This prevents operations from following a symlinked parent into an
-/// unintended directory, which could corrupt files outside the config directory.
 pub fn createSymlink(
+    io: Io,
     source_path: []const u8,
     target_path: []const u8,
     name: []const u8,
     allocator: std.mem.Allocator,
-    logger: *zlap.Logger,
+    dry_run: bool,
+    log: *zlap.Logger,
 ) !void {
-    logger.info("Setting up {s}", .{name});
+    log.info("Setting up {s}", .{name});
 
-    const work_dir = fs.cwd();
+    const work_dir = Io.Dir.cwd();
 
-    work_dir.access(source_path, .{}) catch {
-        logger.err("Source does not exist: {s}", .{source_path});
+    // Verify source exists
+    work_dir.access(io, source_path, .{}) catch {
+        log.err("Source does not exist: {s}", .{source_path});
         return error.SourceNotFound;
     };
 
-    // Safety guard: verify the target's parent directory is a real directory,
-    // not a symlink. This prevents us from operating through a symlinked parent
-    // and corrupting files in an unintended directory.
-    if (std.fs.path.dirname(target_path)) |parent_dir| {
-        const is_real_dir = verifyIsRealDirectory(parent_dir) catch |err| {
-            logger.err("Target parent directory is not a real directory: {s} (error: {})", .{ parent_dir, err });
-            logger.err("This usually means {s} is a symlink. Run 'nvim-pack link' to fix this.", .{parent_dir});
+    if (dry_run) {
+        log.info("Would link: {s} -> {s}", .{ target_path, source_path });
+        return;
+    }
+
+    // Safety guard: verify the target's parent directory is a real directory
+    if (fs.path.dirname(target_path)) |parent_dir| {
+        const is_real_dir = verifyIsRealDirectory(io, parent_dir) catch |err| {
+            log.err("Target parent directory is not a real directory: {s} (error: {s})", .{ parent_dir, @errorName(err) });
             return err;
         };
         if (!is_real_dir) {
             // Parent directory doesn't exist — create it
-            work_dir.makePath(parent_dir) catch |err| switch (err) {
+            work_dir.createDirPath(io, parent_dir) catch |err| switch (err) {
                 error.PathAlreadyExists => {},
                 else => return err,
             };
         }
     }
 
-    var link_buffer: [std.fs.max_path_bytes]u8 = undefined;
-    if (work_dir.readLink(target_path, &link_buffer)) |current_target| {
+    var link_buffer: [fs.max_path_bytes]u8 = undefined;
+    if (work_dir.readLink(io, target_path, &link_buffer)) |len| {
+        const current_target = link_buffer[0..len];
         if (std.mem.eql(u8, current_target, source_path)) {
-            logger.success("{s}: already linked - {s} -> {s}", .{ name, target_path, source_path });
+            log.success("{s}: already linked - {s} -> {s}", .{ name, target_path, source_path });
             return;
         }
 
-        logger.warning("Replacing existing symlink: {s} -> {s}", .{ target_path, current_target });
-        try work_dir.deleteFile(target_path);
+        log.warning("Replacing existing symlink: {s} -> {s}", .{ target_path, current_target });
+        try work_dir.deleteFile(io, target_path);
     } else |err| switch (err) {
         error.FileNotFound => {},
         error.NotLink => {
-            _ = try backup(target_path, allocator, logger);
+            _ = try backup(io, log, allocator, target_path);
         },
         else => return err,
     }
 
-    try work_dir.symLink(source_path, target_path, .{});
-    logger.success("{s}: linked - {s} -> {s}", .{ name, target_path, source_path });
+    try work_dir.symLink(io, source_path, target_path, .{});
+    log.success("{s}: linked - {s} -> {s}", .{ name, target_path, source_path });
 }
 
 /// Ensures `dir_path` exists as a real directory (not a symlink).
@@ -129,40 +133,41 @@ pub fn createSymlink(
 /// If `dir_path` doesn't exist, creates it.
 /// Returns true if a symlink was replaced, false otherwise.
 pub fn ensureRealDirectory(
+    io: Io,
     dir_path: []const u8,
-    logger: *zlap.Logger,
+    log: *zlap.Logger,
 ) !bool {
-    const work_dir = fs.cwd();
+    const work_dir = Io.Dir.cwd();
 
     // First, check if the path is a symlink (readLink does not follow symlinks)
-    var link_buffer: [std.fs.max_path_bytes]u8 = undefined;
-    if (work_dir.readLink(dir_path, &link_buffer)) |link_target| {
+    var link_buffer: [fs.max_path_bytes]u8 = undefined;
+    if (work_dir.readLink(io, dir_path, &link_buffer)) |len| {
+        const link_target = link_buffer[0..len];
         // It's a symlink — remove it and create a real directory
-        logger.info("Removing existing symlink: {s} -> {s}", .{ dir_path, link_target });
-        try work_dir.deleteFile(dir_path);
-        try work_dir.makePath(dir_path);
-        logger.info("Created directory: {s}", .{dir_path});
+        log.info("Removing existing symlink: {s} -> {s}", .{ dir_path, link_target });
+        try work_dir.deleteFile(io, dir_path);
+        try work_dir.createDirPath(io, dir_path);
+        log.info("Created directory: {s}", .{dir_path});
         return true;
     } else |err| switch (err) {
         error.FileNotFound, error.NotLink => {
             // Not a symlink — check if it exists as a directory or doesn't exist
-            work_dir.access(dir_path, .{}) catch {
+            work_dir.access(io, dir_path, .{}) catch {
                 // Path doesn't exist — create the directory
-                try work_dir.makePath(dir_path);
-                logger.info("Created directory: {s}", .{dir_path});
+                try work_dir.createDirPath(io, dir_path);
+                log.info("Created directory: {s}", .{dir_path});
                 return false;
             };
 
             // Path exists and is not a symlink — verify it's actually a directory
-            var dir = work_dir.openDir(dir_path, .{}) catch {
+            var dir = work_dir.openDir(io, dir_path, .{}) catch {
                 // Exists but not a directory — treat as needing creation
-                // (backup should have been handled by the caller or createSymlink)
-                try work_dir.makePath(dir_path);
-                logger.info("Created directory: {s}", .{dir_path});
+                try work_dir.createDirPath(io, dir_path);
+                log.info("Created directory: {s}", .{dir_path});
                 return false;
             };
-            defer dir.close();
-            const stat = dir.stat() catch {
+            defer dir.close(io);
+            const stat = dir.stat(io) catch {
                 // Can't stat — assume it's a directory and proceed
                 return false;
             };

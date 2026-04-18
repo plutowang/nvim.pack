@@ -8,6 +8,7 @@ lazy-lock.json
 .idea
 .zig-cache
 zig-out/
+zig-pkg/
 .opencode/*
 !.opencode/skills/
 tmp/

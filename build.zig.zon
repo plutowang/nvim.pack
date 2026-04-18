@@ -2,11 +2,11 @@
     .name = .nvim_pack,
     .version = "0.1.0",
     .fingerprint = 0xbe0a1a18f778ced2,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .zlap = .{
-            .url = "https://github.com/plutowang/zlap/archive/v0.0.3-beta.tar.gz",
-            .hash = "zlap-0.0.3-beta-eNQqnOLGAABfCEn-F7mFFVol1IOcD_E53XkquhtXg5Df",
+            .url = "https://github.com/plutowang/zlap/archive/v0.0.5-beta.tar.gz",
+            .hash = "zlap-0.0.5-beta-eNQqnL_GAAA-wdVzSaWdT5OOnoq2-129WQMoxzgEXCup",
         },
     },
     .paths = .{

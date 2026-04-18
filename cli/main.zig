@@ -2,11 +2,11 @@ const std = @import("std");
 const zlap = @import("zlap");
 const link_cmd = @import("commands/link.zig");
 const bench_cmd = @import("commands/bench.zig");
+const context = @import("core/context.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    context.init = init;
+    const allocator = init.arena.allocator();
 
     var logger = zlap.Logger{};
 
@@ -32,8 +32,7 @@ pub fn main() !void {
             .optionWithDefault('t', "top", "Number of slowest sources to show", "N", "15");
     }
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(allocator);
 
     try parser.parse(args);
     try parser.execute();

@@ -1,6 +1,10 @@
 const std = @import("std");
+const Io = std.Io;
+const fs = std.fs;
+
 const zlap = @import("zlap");
 const print = std.debug.print;
+const context = @import("../core/context.zig");
 
 // =============================================================================
 // Startup log parsing
@@ -39,17 +43,14 @@ const SKIP_PREFIXES = [_][]const u8{
     "BufNewFile",
 };
 
-fn parseStartupLog(allocator: std.mem.Allocator, log_path: []const u8) !?ParsedLog {
-    const file = std.fs.cwd().openFile(log_path, .{}) catch |err| {
+fn parseStartupLog(io: Io, allocator: std.mem.Allocator, log_path: []const u8) !?ParsedLog {
+    const contents = Io.Dir.cwd().readFileAlloc(io, log_path, allocator, .limited(10 * 1024 * 1024)) catch |err| {
         print("Warning: could not open startup log: {}\n", .{err});
         return null;
     };
-    defer file.close();
-
-    const contents = try file.readToEndAlloc(allocator, 10 * 1024 * 1024); // 10MB max
     defer allocator.free(contents);
 
-    var sources = std.ArrayList(SourceEntry){};
+    var sources = std.ArrayList(SourceEntry).empty;
     var startup_ms: f64 = 0;
     var last_source_clock: f64 = 0;
 
@@ -146,37 +147,47 @@ const BenchmarkResult = struct {
     startup_log_path: []u8,
 };
 
-fn ensureTmpDir() !void {
-    std.fs.cwd().makeDir("tmp") catch |err| {
+fn ensureTmpDir(io: Io) !void {
+    const work_dir = Io.Dir.cwd();
+    work_dir.createDirPath(io, "tmp") catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
 }
 
-fn createTempTestFile(allocator: std.mem.Allocator) ![]u8 {
-    const tmp_dir = std.fs.cwd().openDir("tmp", .{}) catch {
+fn createTempTestFile(io: Io, allocator: std.mem.Allocator) ![]u8 {
+    const work_dir = Io.Dir.cwd();
+    const tmp_dir = work_dir.openDir(io, "tmp", .{}) catch {
         print("Error: could not open ./tmp directory\n", .{});
         return error.NoTmpDir;
     };
-    const file = try tmp_dir.createFile("nvim_bench_test.lua", .{ .read = true, .truncate = true });
-    defer file.close();
-    try file.writeAll("-- Neovim startup benchmark test file\n");
-    try file.writeAll("local x = 1\n");
+    defer tmp_dir.close(io);
+    const file = try tmp_dir.createFile(io, "nvim_bench_test.lua", .{ .read = true, .truncate = true });
+    defer file.close(io);
+    var content_buf: [100]u8 = undefined;
+    const content = try std.fmt.bufPrint(&content_buf, "-- Neovim startup benchmark test file\nlocal x = 1\n", .{});
+    try file.writeStreamingAll(io, content);
 
-    // Return absolute path so nvim's `edit` command works regardless of its cwd
-    var abs_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const abs_path = try std.fs.cwd().realpath("tmp/nvim_bench_test.lua", &abs_buf);
-    return try allocator.dupe(u8, abs_path);
+    // Get absolute path to the test file
+    const cwd = try std.process.currentPathAlloc(io, allocator);
+    defer allocator.free(cwd);
+    const abs_path = try fs.path.join(allocator, &.{ cwd, "tmp/nvim_bench_test.lua" });
+    return abs_path;
 }
 
-fn runBenchmark(allocator: std.mem.Allocator, file_path: []const u8, settle_ms: u32, iteration: u32) !BenchmarkResult {
+fn runBenchmark(io: Io, allocator: std.mem.Allocator, file_path: []const u8, settle_ms: u32, iteration: u32) !BenchmarkResult {
     // Create unique startup log path for this iteration (absolute path for nvim)
     var rel_buf: [128]u8 = undefined;
     const rel_log = try std.fmt.bufPrint(&rel_buf, "tmp/nvim_startup_{d}.log", .{iteration});
-    var log_buf: [std.fs.max_path_bytes]u8 = undefined;
     // Touch the file first so realpath can resolve it
-    const touch = try std.fs.cwd().createFile(rel_log, .{ .truncate = false });
-    touch.close();
-    const log_path = try std.fs.cwd().realpath(rel_log, &log_buf);
+    const work_dir = Io.Dir.cwd();
+    const touch = try work_dir.createFile(io, rel_log, .{ .truncate = false });
+    touch.close(io);
+
+    // Get absolute path to the log file
+    const cwd = try std.process.currentPathAlloc(io, allocator);
+    defer allocator.free(cwd);
+    const log_path = try fs.path.join(allocator, &.{ cwd, rel_log });
+    defer allocator.free(log_path);
 
     // Build the nvim command:
     // nvim --headless --startuptime <log>
@@ -190,48 +201,33 @@ fn runBenchmark(allocator: std.mem.Allocator, file_path: []const u8, settle_ms: 
     var edit_cmd_buf: [512]u8 = undefined;
     const edit_cmd = try std.fmt.bufPrint(&edit_cmd_buf, "edit {s}", .{file_path});
 
-    var child = std.process.Child.init(&.{
-        "nvim",
-        "--headless",
-        "--startuptime",
-        log_path,
-        "-c",
-        edit_cmd,
-        "-c",
-        "doautocmd UIEnter",
-        "-c",
-        settle_cmd,
-        "-c",
-        "qa!",
-    }, allocator);
-    child.stdout_behavior = .Ignore;
-    child.stderr_behavior = .Ignore;
+    const start_time = std.Io.Clock.real.now(io);
+    const start_ns = start_time.toNanoseconds();
 
-    const start_time = std.time.nanoTimestamp();
-
-    try child.spawn();
-    const term = try child.wait();
-
-    const end_time = std.time.nanoTimestamp();
+    var child = try std.process.spawn(io, .{
+        .argv = &.{ "nvim", "--headless", "--startuptime", log_path, "-c", edit_cmd, "-c", "doautocmd UIEnter", "-c", settle_cmd, "-c", "qa!" },
+    });
+    const term = child.wait(io) catch |err| return err;
 
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) return error.ProcessFailed;
         },
         else => return error.ProcessFailed,
     }
 
-    const duration_ns = end_time - start_time;
+    const end_ns = std.Io.Clock.real.now(io).toNanoseconds();
+
+    const duration_ns = end_ns - start_ns;
     const duration_ms = @as(f64, @floatFromInt(duration_ns)) / 1_000_000.0;
 
     // Parse the startup log to get the actual startup time (excludes settle sleep)
-    var startup_ms: f64 = duration_ms; // fallback to wall time if log parsing fails
-    var parsed_opt = parseStartupLog(allocator, log_path) catch null;
+    var startup_ms: f64 = duration_ms;
+    var parsed_opt = try parseStartupLog(io, allocator, log_path);
     if (parsed_opt) |*parsed| {
         if (parsed.startup_ms > 0) {
             startup_ms = parsed.startup_ms;
         }
-        // Free parsed source names
         for (parsed.sources.items) |entry| {
             allocator.free(entry.name);
         }
@@ -344,34 +340,30 @@ fn printSourceBreakdown(sources: *std.ArrayList(SourceEntry), top_n: u32) void {
 
 pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     const allocator = parser.allocator;
+    const io = context.init.io;
 
-    // Parse --file option
     const file_path_opt = parser.getOption("file");
     const file_path = if (file_path_opt) |p| try allocator.dupe(u8, p) else &.{};
     defer if (file_path.len > 0) allocator.free(file_path);
 
-    // Parse --iterations option
     const iterations_str = parser.getOption("iterations") orelse "30";
     const iterations = std.fmt.parseInt(u32, iterations_str, 10) catch {
         parser.logger.err("Invalid number for --iterations: '{s}'", .{iterations_str});
         return error.UnknownOption;
     };
 
-    // Parse --settle option
     const settle_str = parser.getOption("settle") orelse "200";
     const settle_ms = std.fmt.parseInt(u32, settle_str, 10) catch {
         parser.logger.err("Invalid number for --settle: '{s}'", .{settle_str});
         return error.UnknownOption;
     };
 
-    // Parse --warmup option
     const warmup_str = parser.getOption("warmup") orelse "3";
     const warmup = std.fmt.parseInt(u32, warmup_str, 10) catch {
         parser.logger.err("Invalid number for --warmup: '{s}'", .{warmup_str});
         return error.UnknownOption;
     };
 
-    // Parse --top option
     const top_str = parser.getOption("top") orelse "15";
     const top_n = std.fmt.parseInt(u32, top_str, 10) catch {
         parser.logger.err("Invalid number for --top: '{s}'", .{top_str});
@@ -379,7 +371,7 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     };
 
     // Ensure ./tmp/ exists for scratch files (logs, test file).
-    ensureTmpDir() catch |err| {
+    ensureTmpDir(io) catch |err| {
         parser.logger.err("Could not create ./tmp directory: {}", .{err});
         return;
     };
@@ -387,7 +379,7 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
     // Determine the test file path
     var own_test_file = false;
     const test_file_path: []const u8 = if (file_path.len > 0) file_path else blk: {
-        const created = createTempTestFile(allocator) catch |err| {
+        const created = createTempTestFile(io, allocator) catch |err| {
             parser.logger.err("Error creating temp test file: {}", .{err});
             return;
         };
@@ -407,7 +399,7 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
         print("Warming up ({d} iterations)...\n", .{warmup});
         var i: u32 = 0;
         while (i < warmup) : (i += 1) {
-            const result = runBenchmark(allocator, test_file_path, settle_ms, 999_900 + i) catch {
+            const result = runBenchmark(io, allocator, test_file_path, settle_ms, 999_900 + i) catch {
                 print("  Warmup {d} failed\n", .{i + 1});
                 continue;
             };
@@ -416,10 +408,9 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
         print("Warmup complete.\n\n", .{});
     }
 
-    // Benchmark iterations
     print("Running {d} benchmark iterations...\n\n", .{iterations});
 
-    var times = std.ArrayList(f64){};
+    var times = std.ArrayList(f64).empty;
     defer times.deinit(allocator);
 
     var last_log_path: ?[]u8 = null;
@@ -431,12 +422,11 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
             print("  Progress: {d}/{d}\n", .{ i + 1, iterations });
         }
 
-        const result = runBenchmark(allocator, test_file_path, settle_ms, i) catch {
+        const result = runBenchmark(io, allocator, test_file_path, settle_ms, i) catch {
             failures += 1;
             continue;
         };
 
-        // Free previous log path before overwriting
         if (last_log_path) |old_path| {
             allocator.free(old_path);
         }
@@ -449,12 +439,10 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
         print("\n  {d} iteration(s) failed\n", .{failures});
     }
 
-    // Calculate and print aggregate stats
     try calculateStats(times.items, allocator);
 
-    // Parse and print per-source breakdown from the last successful run's startup log
     if (last_log_path) |log_path| {
-        var parsed_opt = parseStartupLog(allocator, log_path) catch null;
+        var parsed_opt = try parseStartupLog(io, allocator, log_path);
         if (parsed_opt) |*parsed| {
             defer {
                 for (parsed.sources.items) |entry| {
@@ -467,23 +455,21 @@ pub fn handler(parser: *zlap.Parser) zlap.ParseError!void {
         allocator.free(log_path);
     }
 
-    // Cleanup test file if we created it
+    const work_dir = Io.Dir.cwd();
     if (own_test_file) {
-        std.fs.cwd().deleteFile("tmp/nvim_bench_test.lua") catch {};
+        work_dir.deleteFile(io, "tmp/nvim_bench_test.lua") catch {};
     }
 
-    // Clean up startup log files
     var log_i: u32 = 0;
     while (log_i < iterations) : (log_i += 1) {
         var log_buf: [256]u8 = undefined;
         const log_path = std.fmt.bufPrint(&log_buf, "tmp/nvim_startup_{d}.log", .{log_i}) catch continue;
-        std.fs.cwd().deleteFile(log_path) catch {};
+        work_dir.deleteFile(io, log_path) catch {};
     }
-    // Also clean up warmup logs
     var warmup_i: u32 = 0;
     while (warmup_i < warmup) : (warmup_i += 1) {
         var log_buf: [256]u8 = undefined;
         const log_path = std.fmt.bufPrint(&log_buf, "tmp/nvim_startup_{d}.log", .{999_900 + warmup_i}) catch continue;
-        std.fs.cwd().deleteFile(log_path) catch {};
+        work_dir.deleteFile(io, log_path) catch {};
     }
 }
