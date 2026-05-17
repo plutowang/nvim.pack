@@ -65,10 +65,29 @@ local function toggle_between_themes()
 
   require('catppuccin').setup {
     flavour = theme_config.flavour,
+    term_colors = false,
     color_overrides = theme_config.color_overrides,
   }
 
   vim.cmd('colorscheme catppuccin')
+
+  -- Reapply terminal colors (Catppuccin term_colors reset them)
+  vim.g.terminal_color_0  = '#5c5f77'
+  vim.g.terminal_color_1  = '#d20f39'
+  vim.g.terminal_color_2  = '#40a02b'
+  vim.g.terminal_color_3  = '#df8e1d'
+  vim.g.terminal_color_4  = '#1e66f5'
+  vim.g.terminal_color_5  = '#8839ef'
+  vim.g.terminal_color_6  = '#179299'
+  vim.g.terminal_color_7  = '#7c7f93'  -- overlay2 (darker)
+  vim.g.terminal_color_8  = '#6c6f85'
+  vim.g.terminal_color_9  = '#d20f39'
+  vim.g.terminal_color_10 = '#40a02b'
+  vim.g.terminal_color_11 = '#fe640b'  -- peach (darker)
+  vim.g.terminal_color_12 = '#1e66f5'
+  vim.g.terminal_color_13 = '#8839ef'
+  vim.g.terminal_color_14 = '#179299'
+  vim.g.terminal_color_15 = '#4c4f69'
 
   if package.loaded['heirline'] then
     require('heirline').reset_highlights()
@@ -88,6 +107,7 @@ vim.opt.background = theme_config.background
 
 require('catppuccin').setup {
   flavour = theme_config.flavour,
+  term_colors = false,
   dim_inactive = {
     enabled = true,
     shade = current_theme == 'latte' and 'light' or 'dark',
@@ -185,5 +205,23 @@ require('catppuccin').setup {
     }
   end,
 }
-
 vim.cmd.colorscheme 'catppuccin'
+
+-- Terminal color palette — Catppuccin Latte (light-background compatible)
+-- Set AFTER colorscheme so Catppuccin's compiled term_colors takes a back seat.
+vim.g.terminal_color_0  = '#5c5f77'
+vim.g.terminal_color_1  = '#d20f39'
+vim.g.terminal_color_2  = '#40a02b'
+vim.g.terminal_color_3  = '#df8e1d'
+vim.g.terminal_color_4  = '#1e66f5'
+vim.g.terminal_color_5  = '#8839ef'
+vim.g.terminal_color_6  = '#179299'
+vim.g.terminal_color_7  = '#7c7f93'  -- overlay2 (darker)
+vim.g.terminal_color_8  = '#6c6f85'
+vim.g.terminal_color_9  = '#d20f39'
+vim.g.terminal_color_10 = '#40a02b'
+vim.g.terminal_color_11 = '#fe640b'  -- peach (darker)
+vim.g.terminal_color_12 = '#1e66f5'
+vim.g.terminal_color_13 = '#8839ef'
+vim.g.terminal_color_14 = '#179299'
+vim.g.terminal_color_15 = '#4c4f69'
