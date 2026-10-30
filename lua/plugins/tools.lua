@@ -175,11 +175,6 @@ function M.diagnostics()
 end
 
 function M.productivity()
-  -- undotree settings
-  vim.g.undotree_WindowLayout = 2
-  vim.g.undotree_SplitWidth = 30
-  vim.g.undotree_SetFocusWhenToggle = 1
-
   -- Native file operations (replaces nvim-genghis)
   vim.keymap.set('n', '<leader>fr', function()
     local old = vim.fn.expand('%:p')
@@ -278,8 +273,8 @@ function M.productivity()
     end
   end, { desc = "[U]tility session [D]on't save" })
 
-  -- Undotree
-  vim.keymap.set('n', '<leader>uu', '<cmd>UndotreeToggle<cr>', { desc = '[U]ndotree toggle' })
+  -- Undotree (native 0.12 package; loaded via :packadd nvim.undotree)
+  vim.keymap.set('n', '<leader>uu', '<cmd>Undotree<cr>', { desc = '[U]ndotree toggle' })
 end
 
 return M

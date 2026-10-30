@@ -30,7 +30,8 @@ vim.pack.add({
   'https://github.com/folke/lazydev.nvim',
 
   -- Completion
-  'https://github.com/saghen/blink.cmp',
+  -- Pin to the 1.x line: v2 is a breaking rewrite on `main` (requires blink.lib).
+  { src = 'https://github.com/saghen/blink.cmp', version = vim.version.range('1.*') },
 
   -- Formatting
   'https://github.com/stevearc/conform.nvim',
@@ -42,7 +43,7 @@ vim.pack.add({
 
   -- Git
   'https://github.com/lewis6991/gitsigns.nvim',
-  'https://github.com/sindrets/diffview.nvim',
+  'https://github.com/esmuellert/codediff.nvim',
 
   -- Utilities
   -- (snacks.nvim, auto-save.nvim replaced by native implementations in core/native.lua and core/autocmds.lua)
@@ -82,7 +83,6 @@ vim.pack.add({
   'https://github.com/kndndrj/nvim-dbee',
 
   -- Productivity
-  'https://github.com/mbbill/undotree',
   -- (nvim-genghis and persistence.nvim replaced by native implementations in tools.lua and core/autocmds.lua)
 
   -- Language-specific
@@ -90,10 +90,13 @@ vim.pack.add({
   'https://github.com/MeanderingProgrammer/render-markdown.nvim',
 
   -- Visual effects
-  'https://github.com/NvChad/nvim-colorizer.lua',
+  'https://github.com/catgoose/nvim-colorizer.lua',
 
   -- Statusline
   'https://github.com/rebelot/heirline.nvim',
+
+  -- AI / OpenCode integration
+  'https://github.com/nickjvandyke/opencode.nvim',
 
 }, { confirm = false, load = function() end })
 
@@ -131,6 +134,10 @@ pack.setup({
   -- { mod = 'lualine',    event = 'UIEnter', packadd = { 'lualine.nvim', 'nvim-web-devicons' } },
   { mod = 'heirline',   event = 'UIEnter', packadd = { 'heirline.nvim', 'nvim-web-devicons' } },
   { mod = 'ui',         fn = 'which_key', event = 'UIEnter', packadd = { 'which-key.nvim' } },
+  -- Loaded 1ms after startup so the plugin is on the runtimepath and
+  -- `:checkhealth opencode` resolves. Only keymaps are registered; no server is
+  -- contacted because `require('opencode')` happens inside each callback.
+  { mod = 'opencode',   fn = 'setup', defer = 1, packadd = { 'opencode.nvim' } },
   { mod = 'navigation', event = 'UIEnter', packadd = { 'neo-tree.nvim', 'nui.nvim', 'flash.nvim', 'nvim-spider' } },
   { mod = 'editing',    fn = 'base_ui',    event = 'UIEnter', packadd = { 'indent-blankline.nvim', 'rainbow-delimiters.nvim' } },
   { mod = 'editing',    fn = 'autopairs',  event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'nvim-autopairs' } },
@@ -241,8 +248,7 @@ pack.setup({
   { mod = 'git', fn = 'diff', keys = {
       { '<leader>hd',   desc = 'Git Diff against index' },
       { '<leader>hD',   desc = 'Git Diff Last Commit' },
-      { '<leader>hm',   desc = 'Git Merge Conflict' },
-    }, packadd = { 'diffview.nvim', 'plenary.nvim' } },
+    }, packadd = { 'codediff.nvim' } },
 
   { mod = 'tools', fn = 'diagnostics', keys = {
       { '<leader>xx',   desc = 'Diagnostics (Trouble)' },
@@ -251,7 +257,7 @@ pack.setup({
     }, packadd = { 'trouble.nvim' } },
 
   { mod = 'tools', fn = 'productivity', keys = {
-      { '<leader>uu',   desc = 'Undotree Toggle' },
+      { '<leader>uu',   desc = '[U]ndotree Toggle' },
       { '<leader>us',   desc = 'Session Restore' },
       { '<leader>ud',   desc = "Don't Save Session" },
       { '<leader>fr',   desc = 'File Rename' },
@@ -260,7 +266,7 @@ pack.setup({
       { '<leader>fx',   desc = 'File Move' },
       { '<leader>fc',   desc = 'File Copy Path' },
       { '<leader>fy',   desc = 'File Copy Relative Path' },
-    }, packadd = { 'undotree' } },
+    }, packadd = { 'nvim.undotree' } },
 
   -- -------------------------------------------------------------------------
   -- Deferred (idle — load after defer ms)

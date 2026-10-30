@@ -34,6 +34,7 @@ function M.which_key()
       { '<leader>n', group = '[N]o/Clear' },
       { '<leader>u', group = '[U]tility/Settings' },
       { '<leader>f', group = '[F]ile' },
+      { '<leader>o', group = '[O]penCode' },
       { 'gr', group = 'LSP Actions' },
       { ']', group = 'Next' },
       { '[', group = 'Previous' },

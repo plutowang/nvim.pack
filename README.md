@@ -40,10 +40,11 @@ nvim.pack/
 │       ├── debugging.lua    # DAP ecosystem
 │       ├── deferred.lua     # render-markdown, snacks.image, colorizer, guess-indent, todo-comments
 │       ├── editing.lua      # indent-blankline, rainbow-delimiters, conform
-│       ├── git.lua          # gitsigns, diffview
+│       ├── git.lua          # gitsigns, codediff
 │       ├── heirline.lua     # Statusline
 │       ├── lsp.lua          # LSP, Mason, lazydev
 │       ├── navigation.lua   # neo-tree, flash, spider
+│       ├── opencode.lua     # OpenCode bridge (ask/select/operator)
 │       ├── telescope.lua    # Fuzzy finder
 │       ├── tools.lua        # testing, database, diagnostics, productivity
 │       ├── treesitter.lua   # TS core, context, textobjects
@@ -81,7 +82,7 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 | **BufReadPre**     | On file open             | Treesitter, LSP, rustaceanvim, gitsigns, treesitter-context, snacks image (mermaid, `*.md`) |
 | **InsertEnter**    | On first insert       | blink.cmp, autopairs                                    |
 | **BufWritePre**    | On save                  | conform.nvim (formatting)                           |
-| **Keymap**         | On first keypress        | Telescope, DAP, testing, database, diffview, trouble, productivity, surround, grug-far, treesj |
+| **Keymap**         | On first keypress        | Telescope, DAP, testing, database, codediff, opencode, trouble, productivity, surround, grug-far, treesj |
 | **Deferred**       | After 1ms idle           | render-markdown, colorizer, guess-indent, todo-comments |
 
 ## CLI Tool

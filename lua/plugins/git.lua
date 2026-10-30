@@ -61,57 +61,21 @@ function M.signs()
 end
 
 function M.diff()
-  -- diffview.nvim
-  local diffview = require('diffview')
-
-  diffview.setup({
-    diff_binaries = false,
-    enhanced_diff_hl = true,
-    use_per_buffer_settings = 'only',
-    show_help_hints = true,
-    hooks = {
-      diff_buf_read = function(bufnr)
-        vim.keymap.set('n', 'q', ':DiffviewClose<CR>', { buffer = bufnr, desc = 'Close diffview' })
-        vim.keymap.set('n', '<leader>q', ':DiffviewClose<CR>', { buffer = bufnr, desc = 'Close diffview' })
-      end,
-    },
-    keymaps = {
-      disable_defaults = false,
-      view = {
-        ['<leader>q'] = ':DiffviewClose<CR>',
-        ['q'] = ':DiffviewClose<CR>',
-      },
-      diff_builder = {
-        [']c'] = function() diffview.nav_hunk('next') end,
-        ['[c'] = function() diffview.nav_hunk('prev') end,
-      },
-    },
-    defaults = {
-      view = {
-        default = {
-          layout = 'diff3_mixed',
-        },
-      },
-      file_history = {
-        layout = 'diff3_mixed',
-      },
-    },
+  -- codediff.nvim: side-by-side diff viewer.
+  -- q / ]c / [c defaults come from the plugin's own view keymaps.
+  require('codediff').setup({
+    diff = { layout = 'side-by-side', filler_text = '' },
   })
 
-  vim.opt.fillchars:append({ diff = "░" })
+  vim.opt.fillchars:append({ diff = '░' })
 
-  -- Keybindings for opening diffs
   vim.keymap.set('n', '<leader>hd', function()
-    vim.cmd('DiffviewOpen')
+    vim.cmd('CodeDiff')
   end, { desc = 'Git [d]iff against index' })
 
   vim.keymap.set('n', '<leader>hD', function()
-    vim.cmd('DiffviewOpen HEAD^')
+    vim.cmd('CodeDiff HEAD~1')
   end, { desc = 'Git [D]iff against last commit' })
-
-  vim.keymap.set('n', '<leader>hm', function()
-    vim.cmd('DiffviewOpen --conflict')
-  end, { desc = 'Git [m]erge conflict' })
 end
 
 return M
