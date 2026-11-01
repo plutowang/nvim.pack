@@ -1,5 +1,9 @@
 # nvim.pack
 
+[![Hosted on Codeberg](https://img.shields.io/badge/Hosted_on-Codeberg-2185d0?logo=codeberg)](https://codeberg.org/bwang-dev/nvim.pack) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+> **Note:** The canonical repository for this project is hosted on [Codeberg](https://codeberg.org/bwang-dev/nvim.pack). This GitHub repository is maintained solely as a read-only mirror. Please open issues and pull requests on Codeberg.
+
 A minimalist, declarative Neovim configuration built on **Neovim 0.12+'s native `vim.pack`** package management, orchestrated by a custom loading engine (`core.pack`). No third-party plugin manager required.
 
 ## Philosophy
