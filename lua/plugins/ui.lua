@@ -53,7 +53,7 @@ function M.which_key()
   }
 end
 
-function M.snacks()
+function M.native()
   -- Native replacements for snacks.nvim features
   -- bigfile and quickfile are loaded via separate VimEnter registry entries.
   local native = require('core.native')

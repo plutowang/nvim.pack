@@ -1,5 +1,5 @@
 -- Cached .gitignore filter that removes docs/ entries so they become
--- visible in Telescope and other tools. When a project has docs/ in
+-- visible in the picker and other tools. When a project has docs/ in
 -- .gitignore, this module provides a filtered ignore file containing
 -- everything EXCEPT docs/. Consumers use --ignore-file to feed it to fd/rg.
 --

@@ -18,7 +18,7 @@ function M.base_ui()
         'help',
         'alpha',
         'dashboard',
-        'neo-tree',
+        'snacks_picker_list',
         'Trouble',
         'trouble',
         'lazy',

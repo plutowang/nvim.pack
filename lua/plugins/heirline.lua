@@ -1084,32 +1084,6 @@ local TabPages = {
 	utils.make_tablist(Tabpage),
 }
 
--- Neo-tree sidebar offset
-local TabLineOffset = {
-	condition = function(self)
-		local win = vim.api.nvim_tabpage_list_wins(0)[1]
-		local bufnr = vim.api.nvim_win_get_buf(win)
-		self.winid = win
-		if vim.bo[bufnr].filetype == "neo-tree" then
-			self.title = "Neo-tree"
-			return true
-		end
-	end,
-	provider = function(self)
-		local title = self.title
-		local width = vim.api.nvim_win_get_width(self.winid)
-		local pad = math.ceil((width - #title) / 2)
-		return string.rep(" ", pad) .. title .. string.rep(" ", pad)
-	end,
-	hl = function(self)
-		if vim.api.nvim_get_current_win() == self.winid then
-			return { fg = "text", bg = "surface1" }
-		else
-			return { fg = "overlay0", bg = "surface0" }
-		end
-	end,
-}
-
 -- Build bufnr → position index map once per tabline render (O(M) scan, not O(N×M))
 local TabLine = {
 	init = function(self)
@@ -1121,7 +1095,6 @@ local TabLine = {
 			self._buf_indices[b] = i
 		end
 	end,
-	TabLineOffset,
 	BufferLine,
 	TabPages,
 }
@@ -1143,7 +1116,7 @@ heirline.setup({
 				filetype = {
 					"^git.*",
 					"fugitive",
-					"neo%-tree",
+					"snacks_picker_list",
 					"Trouble",
 					"lazy",
 					"alpha",

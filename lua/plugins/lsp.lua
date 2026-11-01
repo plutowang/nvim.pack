@@ -18,47 +18,38 @@ vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(event)
     local map = function(keys, func, desc, mode)
       mode = mode or 'n'
-      vim.keymap.set(mode, keys, func, { buffer = event.buf, desc = 'LSP: ' .. desc })
+      vim.keymap.set(mode, keys, func, { buf = event.buf, desc = 'LSP: ' .. desc })
     end
 
-    -- Delegates to telescope.lua's idempotent M.setup() for lazy loading.
-    local function telescope_builtin(fn_name)
+    -- Snacks is initialized at VimEnter, before any interactive keypress.
+    local function snacks_picker(fn_name, opts)
       return function()
-        require('plugins.telescope').setup()
-        require('telescope.builtin')[fn_name]()
+        Snacks.picker[fn_name](opts)
       end
     end
 
     map('grn', vim.lsp.buf.rename, '[R]e[n]ame')
     map('gra', vim.lsp.buf.code_action, '[G]oto Code [A]ction', { 'n', 'x' })
-    map('grr', telescope_builtin('lsp_references'), '[G]oto [R]eferences')
-    map('gri', telescope_builtin('lsp_implementations'), '[G]oto [I]mplementation')
-    map('grd', telescope_builtin('lsp_definitions'), '[G]oto [D]efinition')
+    map('grr', snacks_picker('lsp_references', { auto_confirm = false }), '[G]oto [R]eferences')
+    map('gri', snacks_picker('lsp_implementations', { auto_confirm = false }), '[G]oto [I]mplementation')
+    map('grd', snacks_picker('lsp_definitions', { auto_confirm = false }), '[G]oto [D]efinition')
     map('grD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-    map('gO', telescope_builtin('lsp_document_symbols'), 'Open Document Symbols')
-    map('gW', telescope_builtin('lsp_dynamic_workspace_symbols'), 'Open Workspace Symbols')
-    map('grt', telescope_builtin('lsp_type_definitions'), '[G]oto [T]ype Definition')
-
-    local function client_supports_method(client, method, bufnr)
-      if vim.fn.has('nvim-0.11') == 1 then
-        return client:supports_method(method, bufnr)
-      else
-        return client.supports_method(method, { bufnr = bufnr })
-      end
-    end
+    map('gO', snacks_picker('lsp_symbols'), 'Open Document Symbols')
+    map('gW', snacks_picker('lsp_workspace_symbols'), 'Open Workspace Symbols')
+    map('grt', snacks_picker('lsp_type_definitions', { auto_confirm = false }), '[G]oto [T]ype Definition')
 
     local client = vim.lsp.get_client_by_id(event.data.client_id)
 
     -- Document highlight on cursor hold
-    if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf) then
+    if client and client:supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf) then
       local highlight_augroup = vim.api.nvim_create_augroup('nvimpack-lsp-highlight', { clear = false })
       vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
-        buffer = event.buf,
+        buf = event.buf,
         group = highlight_augroup,
         callback = vim.lsp.buf.document_highlight,
       })
       vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
-        buffer = event.buf,
+        buf = event.buf,
         group = highlight_augroup,
         callback = vim.lsp.buf.clear_references,
       })
@@ -66,13 +57,13 @@ vim.api.nvim_create_autocmd('LspAttach', {
         group = vim.api.nvim_create_augroup('nvimpack-lsp-detach', { clear = true }),
         callback = function(event2)
           vim.lsp.buf.clear_references()
-          vim.api.nvim_clear_autocmds { group = 'nvimpack-lsp-highlight', buffer = event2.buf }
+          vim.api.nvim_clear_autocmds { group = 'nvimpack-lsp-highlight', buf = event2.buf }
         end,
       })
     end
 
     -- Inlay hints: enable on attach, toggle keymap
-    if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_inlayHint, event.buf) then
+    if client and client:supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint, event.buf) then
       vim.lsp.inlay_hint.enable(true, { bufnr = event.buf })
       map('<leader>th', function()
         local enabled = vim.lsp.inlay_hint.is_enabled { bufnr = event.buf }

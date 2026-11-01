@@ -76,14 +76,13 @@ local function open_terminal(cmd, opts)
 
   if not existing or not vim.api.nvim_buf_is_valid(existing) then
     local shell_cmd = cmd and { vim.o.shell, '-c', cmd } or { vim.o.shell }
-    vim.fn.termopen(shell_cmd, {
+    local job_id = vim.fn.jobstart(shell_cmd, {
+      term = true,
       on_exit = function(_, exit_code)
         vim.schedule(function()
           if opts.autoclose == false or exit_code ~= 0 then
-            -- Keep the window open: either requested or process exited with error
             return
           end
-          -- Auto-close the floating window and clean up the buffer on process exit
           _term_bufs[cmd_key] = nil
           close_float_by_buf(buf)
           if vim.api.nvim_buf_is_valid(buf) then
@@ -92,19 +91,28 @@ local function open_terminal(cmd, opts)
         end)
       end,
     })
+    if job_id <= 0 then
+      vim.notify('Failed to start terminal: ' .. table.concat(shell_cmd, ' '), vim.log.levels.ERROR)
+      _term_bufs[cmd_key] = nil
+      close_float_by_buf(buf)
+      if vim.api.nvim_buf_is_valid(buf) then
+        vim.api.nvim_buf_delete(buf, { force = true })
+      end
+      return
+    end
     _term_bufs[cmd_key] = buf
   end
 
   -- q in normal mode closes the floating window
   vim.keymap.set('n', 'q', function()
     close_float_by_buf(buf)
-  end, { buffer = buf, desc = 'Close terminal window' })
+  end, { buf = buf, desc = 'Close terminal window' })
 
   -- <C-q> in terminal mode exits terminal mode and closes the window
   vim.keymap.set('t', '<C-q>', function()
     vim.cmd('stopinsert')
     close_float_by_buf(buf)
-  end, { buffer = buf, desc = 'Exit and close terminal window' })
+  end, { buf = buf, desc = 'Exit and close terminal window' })
 
   vim.cmd('startinsert')
 end
@@ -268,7 +276,7 @@ local function open_scratch_win(buf, title)
   open_float_win(buf, { title = title })
   vim.keymap.set('n', 'q', function()
     close_float_by_buf(buf)
-  end, { buffer = buf, desc = 'Close scratch window' })
+  end, { buf = buf, desc = 'Close scratch window' })
 end
 
 function M.scratch()

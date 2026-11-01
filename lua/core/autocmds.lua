@@ -125,21 +125,6 @@ vim.api.nvim_create_autocmd('PackChanged', {
       return
     end
 
-    -- telescope-fzf-native: compile the native sorter
-    if name == 'telescope-fzf-native.nvim' then
-      vim.system({ 'make' }, { cwd = path }, function(result)
-        if result.code ~= 0 then
-          vim.schedule(function()
-            vim.notify('telescope-fzf-native build failed:\n' .. (result.stderr or ''), vim.log.levels.ERROR)
-          end)
-        else
-          vim.schedule(function()
-            vim.notify('telescope-fzf-native built successfully', vim.log.levels.INFO)
-          end)
-        end
-      end)
-    end
-
     -- nvim-treesitter: run :TSUpdate after install/update
     if name == 'nvim-treesitter' then
       vim.schedule(function()

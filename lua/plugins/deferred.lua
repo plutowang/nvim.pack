@@ -12,27 +12,12 @@ function M.markdown()
 end
 
 function M.images()
-  -- snacks.nvim image module: inline mermaid diagrams in markdown buffers.
-  -- conceal("chart") enables the in-place overlay AND the cursor-aware
-  -- hide/show pass (diagram hidden while the cursor is on the block).
+  -- Snacks is configured once; the markdown entry may run before VimEnter.
+  require('plugins.snacks').setup()
   local snacks = require('snacks')
-  snacks.setup {
-    image = {
-      enabled = true,
-      doc = {
-        enabled = true,
-        inline = true,
-        conceal = function(_, type)
-          -- upstream default conceals math; add mermaid ("chart")
-          return type == 'math' or type == 'chart'
-        end,
-      },
-      convert = { notify = true },
-    },
-  }
-  -- snacks sets up the image module on the BufReadPre event; we load snacks
-  -- lazily during that same event, so the in-flight event is missed. Run the
-  -- module setup now (idempotent — guarded by snacks' internal did_setup).
+  if not snacks.config.image.enabled then return end
+  -- snacks sets up the image module on BufReadPre; we load snacks during that
+  -- same event, so the in-flight event is missed. Run it now (idempotent).
   snacks.image.setup()
 
   -- Workaround: markdown fence lines are concealed with `conceal_lines` (by the

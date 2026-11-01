@@ -149,10 +149,7 @@ local function setup_debugging()
 
   -- Auto-open/close DAP UI
   dap.listeners.after.event_initialized['dapui_config'] = function()
-    local neo_tree_ok, neo_tree = pcall(require, 'neo-tree.command')
-    if neo_tree_ok then
-      neo_tree.execute({ action = 'close' })
-    end
+    require('plugins.snacks').close_explorer()
     dapui.open()
     vim.notify('󰃤 Debug session started', vim.log.levels.INFO, { title = 'DAP' })
   end
@@ -322,10 +319,7 @@ vim.keymap.set('n', '<leader>dfu', function()
     end
   end
   if not dap_ui_open then
-    local neo_tree_ok, neo_tree = pcall(require, 'neo-tree.command')
-    if neo_tree_ok then
-      neo_tree.execute({ action = 'close' })
-    end
+    require('plugins.snacks').close_explorer()
   end
   require('dapui').toggle()
 end, { desc = '<F7> [D]ebug [U]I Toggle' })

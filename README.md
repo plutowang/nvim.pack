@@ -43,9 +43,9 @@ nvim.pack/
 │       ├── git.lua          # gitsigns, codediff
 │       ├── heirline.lua     # Statusline
 │       ├── lsp.lua          # LSP, Mason, lazydev
-│       ├── navigation.lua   # neo-tree, flash, spider
+│       ├── navigation.lua   # flash, spider
 │       ├── opencode.lua     # OpenCode bridge (ask/select/operator)
-│       ├── telescope.lua    # Fuzzy finder
+│       ├── snacks.lua       # Picker, explorer, images
 │       ├── tools.lua        # testing, database, diagnostics, productivity
 │       ├── treesitter.lua   # TS core, context, textobjects
 │       └── ui.lua           # which-key, native snacks replacements (terminal/lazygit/bufdelete/scratch), bigfile, quickfile
@@ -82,7 +82,7 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 | **BufReadPre**     | On file open             | Treesitter, LSP, rustaceanvim, gitsigns, treesitter-context, snacks image (mermaid, `*.md`) |
 | **InsertEnter**    | On first insert       | blink.cmp, autopairs                                    |
 | **BufWritePre**    | On save                  | conform.nvim (formatting)                           |
-| **Keymap**         | On first keypress        | Telescope, DAP, testing, database, codediff, opencode, trouble, productivity, surround, grug-far, treesj |
+| **Keymap**         | On first keypress        | Snacks picker, DAP, testing, database, codediff, opencode, trouble, productivity, surround, grug-far, treesj |
 | **Deferred**       | After 1ms idle           | render-markdown, colorizer, guess-indent, todo-comments |
 
 ## CLI Tool
@@ -145,8 +145,8 @@ These tools must be installed for core functionality:
 | ------------- | -------------------------------- | ------------------------------------ |
 | `git`         | Plugin downloads, version control | macOS built-in or `brew install git` |
 | `curl`        | Plugin downloads                 | macOS built-in or `brew install curl`|
-| `rg`          | Grep search (Telescope, grug-far)| `brew install ripgrep`               |
-| `fd`          | File search (Telescope)          | `brew install fd`                    |
+| `rg`          | Grep search (Snacks picker, grug-far)| `brew install ripgrep`               |
+| `fd`          | File search (Snacks picker)          | `brew install fd`                    |
 | `tree-sitter` | Parser compilation               | `cargo install tree-sitter-cli`      |
 | `make`        | Build native extensions          | Xcode CLI tools (`xcode-select --install`) |
 | `cargo`       | blink.cmp Rust fuzzy library     | `brew install rust`                  |
@@ -169,7 +169,9 @@ Mason auto-installs LSP servers, but some servers need language runtimes:
 
 ### Optional — Markdown (images & Mermaid diagrams)
 
-Inline rendering in markdown buffers (snacks.nvim `image` module) covers regular images and mermaid code blocks. Mermaid needs the official mermaid-cli converter plus a Chromium-based browser for Puppeteer; non-PNG images are converted by ImageMagick:
+Inline rendering in markdown buffers (snacks.nvim `image` module) covers regular images and mermaid code blocks. Mermaid needs the official mermaid-cli converter plus a Chromium-based browser for Puppeteer; non-PNG images are converted by ImageMagick.
+
+Without `magick`/`identify`, the image module disables itself at startup; conversion failures are no longer surfaced as notifications.
 
 | Tool | Purpose | Install |
 | ---- | ------- | ------- |
@@ -210,7 +212,7 @@ Note: the `chromium` cask is disabled (Gatekeeper, 2026-09-01) — use a signed 
 ## Known Pitfalls
 
 1. **`packadd` Dependencies**: If a plugin requires another plugin to function, you MUST include the dependency in the `packadd` array of the registry entry.
-2. **`vim.ui.select` Overrides**: Plugins that override core Neovim functions (like `telescope-ui-select`) MUST be loaded early (on `UIEnter`), even if the main plugin is loaded lazily via keymaps.
+2. **`vim.ui.select` Overrides**: `snacks.picker` replaces `vim.ui.select` when `Snacks.setup` runs at `VimEnter`. Keep picker setup early; a shim that restores the original before calling it silently falls back to the built-in prompt.
 3. **Headless Mode**: The `core.pack` engine does NOT bypass lazy loading in headless mode. Trigger the specific event or keymap to load a plugin during a headless script.
 4. **Augroup Collisions**: The engine creates augroups named `'pack-' .. entry.mod .. '-' .. entry.fn`. Never manually create augroups with this naming scheme.
 5. **Keymap Replay**: The engine's keymap trigger uses `nvim_feedkeys` to replay the initial keypress. Ensure the plugin's actual keymap exactly matches the trigger keymap.
@@ -227,3 +229,15 @@ cd ~/.local/share/nvim/site/pack/core/opt/blink.cmp && cargo build --release
 ```
 
 The `PackChanged` autocmd runs this automatically on install/update. If you don't have `cargo` installed, the config falls back to the Lua fuzzy implementation via `fuzzy.implementation = 'prefer_rust'` in `lua/plugins/completion.lua`. To force Lua-only matching, change it to `'lua'`.
+
+### snacks `checkhealth` shows `notifier: is not ready`
+
+Expected. The `notifier` module is intentionally not configured, so `vim.notify` stays native; snacks still runs the notifier health probe and reports it as not ready. No action needed.
+
+### snacks `checkhealth` shows `tectonic`/`pdflatex` missing
+
+Only LaTeX `math` fences need them. Mermaid and regular images are unaffected. Install `tectonic` (or `pdflatex`) if you want math rendering; otherwise ignore the error.
+
+### snacks `checkhealth` warns about disabled modules
+
+`bigfile`, `dashboard`, `input`, `quickfile`, `scope`, `scroll`, `statuscolumn`, and `words` are deliberately left unconfigured to avoid timers/autocmds. Their `setup {disabled}` warnings are expected. Missing treesitter parsers (`latex`, `norg`, `scss`, `svelte`, `typst`, `vue`) only affect image rendering in those document languages; markdown/mermaid works with the installed parsers.

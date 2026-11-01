@@ -19,11 +19,6 @@ vim.pack.add({
   'https://github.com/NMAC427/guess-indent.nvim',
   'https://github.com/folke/todo-comments.nvim',
 
-  -- Fuzzy finder
-  'https://github.com/nvim-telescope/telescope-fzf-native.nvim',
-  'https://github.com/nvim-telescope/telescope-ui-select.nvim',
-  'https://github.com/nvim-telescope/telescope.nvim',
-
   -- LSP + Mason
   'https://github.com/mason-org/mason.nvim',
   'https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim',
@@ -45,9 +40,6 @@ vim.pack.add({
   'https://github.com/lewis6991/gitsigns.nvim',
   'https://github.com/esmuellert/codediff.nvim',
 
-  -- Utilities
-  -- (snacks.nvim, auto-save.nvim replaced by native implementations in core/native.lua and core/autocmds.lua)
-
   -- Editing enhancements
   'https://github.com/windwp/nvim-autopairs',
   'https://github.com/lukas-reineke/indent-blankline.nvim',
@@ -57,7 +49,6 @@ vim.pack.add({
   'https://github.com/Wansmer/treesj',
 
   -- Navigation
-  'https://github.com/nvim-neo-tree/neo-tree.nvim',
   'https://github.com/folke/flash.nvim',
   'https://github.com/chrisgrieser/nvim-spider',
 
@@ -122,9 +113,10 @@ pack.setup({
 
   -- -------------------------------------------------------------------------
   -- VimEnter (non-blocking — loads after init but before UI renders)
-  -- Native snacks replacements: bigfile guard + gitbrowse/lazygit/terminal keymaps
+  -- Snacks setup (picker/explorer/image) + native bigfile/lazygit/terminal keymaps
   -- -------------------------------------------------------------------------
-  { mod = 'ui', fn = 'snacks',    event = 'VimEnter' },
+  { mod = 'snacks', fn = 'setup', event = 'VimEnter', packadd = { 'snacks.nvim' } },
+  { mod = 'ui', fn = 'native',    event = 'VimEnter' },
   { mod = 'ui', fn = 'bigfile',   event = 'VimEnter' },
   { mod = 'ui', fn = 'quickfile', event = 'VimEnter' },
 
@@ -138,7 +130,7 @@ pack.setup({
   -- `:checkhealth opencode` resolves. Only keymaps are registered; no server is
   -- contacted because `require('opencode')` happens inside each callback.
   { mod = 'opencode',   fn = 'setup', defer = 1, packadd = { 'opencode.nvim' } },
-  { mod = 'navigation', event = 'UIEnter', packadd = { 'neo-tree.nvim', 'nui.nvim', 'flash.nvim', 'nvim-spider' } },
+  { mod = 'navigation', event = 'UIEnter', packadd = { 'flash.nvim', 'nvim-spider' } },
   { mod = 'editing',    fn = 'base_ui',    event = 'UIEnter', packadd = { 'indent-blankline.nvim', 'rainbow-delimiters.nvim' } },
   { mod = 'editing',    fn = 'autopairs',  event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'nvim-autopairs' } },
   { mod = 'editing',    fn = 'surround',   keys = {
@@ -155,8 +147,6 @@ pack.setup({
     { 'gS', desc = 'Split node under cursor' },
     { 'gJ', desc = 'Join node under cursor' },
   }, packadd = { 'treesj' } },
-  -- Wire lazy vim.ui.select override on UIEnter (no packadd — telescope loads on first call)
-  { mod = 'telescope',  fn = 'ui_select', event = 'UIEnter' },
 
   -- -------------------------------------------------------------------------
   -- BufReadPre / BufNewFile (core file-level features)
@@ -179,23 +169,6 @@ pack.setup({
   -- -------------------------------------------------------------------------
   -- Keymap-triggered (first keypress loads the module, then replays the key)
   -- -------------------------------------------------------------------------
-
-  { mod = 'telescope', fn = 'setup', keys = {
-      { '<leader>sh',   desc = 'Search Help' },
-      { '<leader>sk',   desc = 'Search Keymaps' },
-      { '<leader>sf',   desc = 'Search Files' },
-      { '<leader>ss',   desc = 'Search Select' },
-      { '<leader>sw',   desc = 'Search Word' },
-      { '<leader>sd',   desc = 'Search Diagnostics' },
-      { '<leader>sr',   desc = 'Search Resume' },
-      { '<leader>s.',   desc = 'Search Recent' },
-      { '<leader>sg',   desc = 'Search Grep' },
-      { '<leader>sG',   desc = 'Search Grep Literal' },
-      { '<leader>sn',   desc = 'Search Neovim' },
-      { '<leader>s/',   desc = 'Search in Open Files' },
-      { '<leader><leader>', desc = 'Find Buffers' },
-      { '<leader>/',     desc = 'Fuzzy Buffer' },
-    } },
 
   { mod = 'debugging', keys = {
       { '<F5>',   desc = 'Debug Continue' },
@@ -243,7 +216,7 @@ pack.setup({
       { '<leader>Dt',   desc = 'DB Toggle UI' },
       { '<leader>Dc',   desc = 'DB Close' },
       { '<leader>De',   desc = 'DB Execute Query' },
-    }, packadd = { 'nvim-dbee' } },
+    }, packadd = { 'nvim-dbee', 'nui.nvim' } },
 
   { mod = 'git', fn = 'diff', keys = {
       { '<leader>hd',   desc = 'Git Diff against index' },

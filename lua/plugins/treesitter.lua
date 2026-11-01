@@ -66,7 +66,7 @@ function M.context()
     on_attach = function(buf)
       local filetype = vim.bo[buf].filetype
       local disabled_filetypes = {
-        'help', 'alpha', 'dashboard', 'neo-tree',
+        'help', 'alpha', 'dashboard', 'snacks_picker_list',
         'Trouble', 'trouble', 'lazy', 'mason',
         'notify', 'toggleterm', 'lazyterm',
       }

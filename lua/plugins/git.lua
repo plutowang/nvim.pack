@@ -15,7 +15,7 @@ function M.signs()
     on_attach = function(bufnr)
       local function map(mode, l, r, opts)
         opts = opts or {}
-        opts.buffer = bufnr
+        opts.buf = bufnr
         vim.keymap.set(mode, l, r, opts)
       end
 
@@ -64,7 +64,8 @@ function M.diff()
   -- codediff.nvim: side-by-side diff viewer.
   -- q / ]c / [c defaults come from the plugin's own view keymaps.
   require('codediff').setup({
-    diff = { layout = 'side-by-side', filler_text = '' },
+    diff = { layout = 'side-by-side', filler_text = '', compact = true },
+    explorer = { view_mode = 'tree' },
   })
 
   vim.opt.fillchars:append({ diff = '░' })

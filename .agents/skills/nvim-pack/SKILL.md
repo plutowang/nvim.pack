@@ -41,8 +41,8 @@ nvim.pack/
 │       ├── git.lua          # gitsigns, diffview
 │       ├── heirline.lua     # Statusline
 │       ├── lsp.lua          # LSP, Mason, lazydev
-│       ├── navigation.lua   # neo-tree, flash, spider
-│       ├── telescope.lua    # Fuzzy finder
+│       ├── navigation.lua   # flash, spider
+│       ├── snacks.lua       # Picker, explorer, images
 │       ├── tools.lua        # testing, database, diagnostics, productivity
 │       ├── treesitter.lua   # TS core, context, textobjects
 │       └── ui.lua           # which-key, native snacks replacements (terminal/lazygit/bufdelete/scratch), bigfile, quickfile
@@ -71,12 +71,12 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 ### Loading Triggers & Timeline
 
 1. **Immediate (Startup)**: No trigger specified. Used *only* for the colorscheme (`catppuccin`) to prevent flashing.
-2. **`VimEnter` Event**: After init completes, before UI renders. Used for native feature setup: bigfile guard, and keymap wiring for lazygit/terminal/bufdelete/scratch (`M.snacks`, `M.bigfile`, `M.quickfile` in `ui.lua` — no `packadd` needed since these are native implementations).
-3. **`UIEnter` Event**: Non-blocking. Loads immediately after the first frame renders. Used for UI components (`heirline`, `which_key`, `neo-tree`, editing visual plugins).
+2. **`VimEnter` Event**: After init completes, before UI renders. Used for native feature setup: bigfile guard, and keymap wiring for lazygit/terminal/bufdelete/scratch (`M.native`, `M.bigfile`, `M.quickfile` in `ui.lua` — no `packadd` needed since these are native implementations).
+3. **`UIEnter` Event**: Non-blocking. Loads immediately after the first frame renders. Used for UI components (`heirline`, `which_key`, editing visual plugins).
 4. **`BufReadPre` / `BufNewFile` Events**: Core file-level features. Used for `treesitter`, `lsp`, `gitsigns`.
 5. **`InsertEnter` / `CmdlineEnter` Events**: Used for completion (`blink.cmp`) and insert helpers (`autopairs`).
 6. **`BufWritePre` Event**: Used for formatting (`conform`).
-7. **Keymaps (`keys`)**: Sets a temporary keymap. On first press, it deletes the temp keymap, loads the plugin, and replays the keypress. Used for `telescope`, `debugging`, `testing`, `surround`, `grug-far`, `treesj`.
+7. **Keymaps (`keys`)**: Sets a temporary keymap. On first press, it deletes the temp keymap, loads the plugin, and replays the keypress. Used for `debugging`, `testing`, `surround`, `grug-far`, `treesj`.
 8. **Deferred (`defer`)**: Idle loading after *N* milliseconds. Used for low-priority visual enhancements (`colorizer`, `render-markdown`).
 
 ## 4. Plugin File Patterns
@@ -93,7 +93,7 @@ function M.which_key()
 end
 
 -- Native replacement (no plugin required — wires keymaps only)
-function M.snacks()
+function M.native()
   local native = require('core.native')
   vim.keymap.set('n', '<leader>gg', native.lazygit, { desc = 'Lazy Git' })
   vim.keymap.set('n', '<leader>tt', native.terminal, { desc = 'Terminal' })
@@ -108,7 +108,7 @@ return M
 ```lua
 { mod = 'ui', fn = 'which_key', event = 'UIEnter', packadd = { 'which-key.nvim' } },
 -- Native entries have NO packadd — they load lua/core/native.lua directly
-{ mod = 'ui', fn = 'snacks',    event = 'VimEnter' },
+{ mod = 'ui', fn = 'native',    event = 'VimEnter' },
 { mod = 'ui', fn = 'bigfile',   event = 'VimEnter' },
 { mod = 'ui', fn = 'quickfile', event = 'VimEnter' },
 ```
@@ -245,9 +245,9 @@ Never run `python` or `python3` directly on the host system.
 
 ## 6. Known Pitfalls & Critical Rules
 
-1. **`packadd` Dependencies**: If a plugin requires another plugin to function (e.g., `lsp` keymaps require `telescope`), you MUST include the dependency in the `packadd` array of the registry entry.
-    * *Example*: `{ mod = 'lsp', event = 'BufReadPre', packadd = { 'mason.nvim', 'mason-tool-installer.nvim', 'telescope.nvim', 'plenary.nvim' } }`
-2. **`vim.ui.select` Overrides**: Plugins that override core Neovim functions (like `telescope-ui-select`) MUST be loaded early (e.g., on `UIEnter`), even if the main plugin (Telescope) is loaded lazily via keymaps. Otherwise, the override won't be active when other plugins (like LSP code actions) try to use it.
+1. **`packadd` Dependencies**: If a plugin requires another plugin to function (e.g., the database UI requires `nui.nvim`), you MUST include the dependency in the `packadd` array of the registry entry.
+    * *Example*: `packadd = { 'nvim-dbee', 'nui.nvim' }`
+2. **`vim.ui.select` Overrides**: `snacks.picker` replaces `vim.ui.select` when `Snacks.setup` runs at `VimEnter`. Keep picker setup early; a shim that restores the original before calling it silently falls back to the built-in prompt.
 3. **Headless Mode**: The `core.pack` engine does NOT bypass lazy loading in headless mode. If you need a plugin to load during a headless script, you must trigger its specific event or keymap.
 4. **Augroup Collisions**: The engine creates augroups named `'pack-' .. entry.mod .. '-' .. entry.fn`. Never manually create augroups with this naming scheme.
 5. **Keymap Replay**: The engine's keymap trigger uses `nvim_feedkeys` to replay the initial keypress. Ensure the plugin's actual keymap exactly matches the trigger keymap, or the replay will fall through to default Neovim behavior.
@@ -259,5 +259,5 @@ Always verify changes using these commands:
 
 1. **Syntax Check**: `luac -p lua/**/*.lua` (Must pass with no errors).
 2. **Headless Startup**: `nvim --headless +quit` (Must exit cleanly with code 0).
-3. **Startup Benchmark**: `zig run eval_startuptime.zig` (Covers immediate + VimEnter + BufReadPre + UIEnter plugins via `doautocmd UIEnter`. Reports last-source clock from `--startuptime` log, excluding settle sleep. Thresholds: ≤50ms EXCELLENT, ≤80ms GOOD, ≤120ms FAIR, >120ms SLOW. Options: `--file`, `--iterations`, `--warmup`, `--settle`, `--top`).
+3. **Startup Benchmark**: `zig run eval_startuptime.zig` (Covers immediate + VimEnter + BufReadPre + UIEnter plugins via `doautocmd VimEnter` + `doautocmd UIEnter`. Reports last-source clock from `--startuptime` log, excluding settle sleep. Thresholds: ≤50ms EXCELLENT, ≤80ms GOOD, ≤120ms FAIR, >120ms SLOW. Options: `--file`, `--iterations`, `--warmup`, `--settle`, `--top`).
 4. **Loaded Modules**: Inside Neovim, run `:lua print(vim.inspect(require('core.pack').loaded()))` to see which modules have been initialized.
