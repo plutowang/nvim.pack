@@ -24,9 +24,9 @@ vim.pack.add({
   'https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim',
   'https://github.com/folke/lazydev.nvim',
 
-  -- Completion
-  -- Pin to the 1.x line: v2 is a breaking rewrite on `main` (requires blink.lib).
-  { src = 'https://github.com/saghen/blink.cmp', version = vim.version.range('1.*') },
+  -- Completion (blink.cmp v2 tracks main; the lock pins the exact rev)
+  'https://github.com/saghen/blink.lib',
+  { src = 'https://github.com/saghen/blink.cmp', version = 'main' },
 
   -- Formatting
   'https://github.com/stevearc/conform.nvim',
@@ -159,7 +159,7 @@ pack.setup({
   -- -------------------------------------------------------------------------
   -- InsertEnter / CmdlineEnter (completion)
   -- -------------------------------------------------------------------------
-  { mod = 'completion', event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'blink.cmp' } },
+  { mod = 'completion', event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'lazydev.nvim', 'blink.lib', 'blink.cmp' } },
 
   -- -------------------------------------------------------------------------
   -- BufWritePre (formatting on save — conform has its own internal guard)
