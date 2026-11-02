@@ -158,20 +158,20 @@ if vim.fn.has('nvim-0.12') == 1 then
     return ui2_active
   end
 
-  local function set_cmdheight()
-    if ui2_active then vim.o.cmdheight = 0 end
-  end
-
   ui2_active = enable_ui2()
   if not ui2_active then
     vim.api.nvim_create_autocmd('UIEnter', {
       once = true,
       callback = function()
-        if enable_ui2() then set_cmdheight() end
+        enable_ui2()
       end,
     })
   end
-  set_cmdheight()
-  -- 'cmdheight' is local to the tabpage; re-apply on tab switches.
-  vim.api.nvim_create_autocmd('TabEnter', { callback = set_cmdheight })
 end
+
+-- Keep one command-line row visible at all times; 'cmdheight' is tabpage-local.
+local function set_cmdheight()
+  vim.o.cmdheight = 1
+end
+set_cmdheight()
+vim.api.nvim_create_autocmd('TabEnter', { callback = set_cmdheight })
