@@ -215,6 +215,9 @@ Note: the `chromium` cask is disabled (Gatekeeper, 2026-09-01) — use a signed 
 - **UI2**: `vim._core.ui2` is enabled when a UI is attached. `cmdheight=1` keeps the command line visible and the view stable; it remains `1` in headless/CI. If messages spill, increase it to `2`.
 - **Borders**: `'winborder'` and `'pumborder'` are `rounded`; explicit plugin borders still win. The `nvim_open_win` shim now only applies `style='minimal'`.
 - **Folding**: native treesitter folds; `'foldtext'` is empty, so folded lines show the first line with syntax highlighting; no fold-text plugin.
+- **Diagnostics**: `'virtual_text'` is off; `virtual_lines.current_line` shows diagnostics only under the cursor. `'underline'` covers all severities; custom Nerd Font signs remain.
+- **LSP progress**: `LspProgress` drives a native OSC 9;4 terminal progress bar. Ghostty resets an idle bar after ~15 s; there is no keepalive timer and no polling.
+- **Statusline**: an event-driven active-token cache drives an O(1) provider; idle client names remain visible; `WinEnter` keeps the global statusline in sync when switching windows.
 
 ## Known Pitfalls
 

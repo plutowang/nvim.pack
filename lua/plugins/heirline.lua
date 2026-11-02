@@ -479,105 +479,167 @@ local Diagnostics = {
 }
 
 -- ---------------------------------------------------------------------------
--- LSP progress cache (updated by autocmd, read by LSPActive init)
+-- LSP status cache (event-driven; O(1) provider)
 -- ---------------------------------------------------------------------------
-local _lsp_progress = {}
+local _lsp_active = {} ---@type table<integer, table<string|integer, { title?: string, message?: string, percentage?: integer }>>
+local _lsp_clients = {} ---@type integer[]
+local _lsp_status = ''
+local _lsp_names = ''
+local _lsp_attached = false
+local _lsp_redraw_pending = false
+local lsp_status_group = vim.api.nvim_create_augroup('HeirlineLspStatus', { clear = true })
 
-vim.api.nvim_create_autocmd("LspProgress", {
-	group = "Heirline",
-	callback = function(ev)
-		local client_id = ev.data.client_id
-		local value = ev.data.params.value
-		if value.kind == "end" then
-			_lsp_progress[client_id] = nil
-		else
-			_lsp_progress[client_id] = {
-				title = value.title or "",
-				message = value.message or "",
-				percentage = value.percentage,
-			}
+local function lsp_truncate(text)
+	if vim.fn.strdisplaywidth(text) <= 40 then
+		return text
+	end
+	return vim.fn.strcharpart(text, 0, 37) .. '…'
+end
+
+local function lsp_schedule_redraw()
+	if _lsp_redraw_pending then
+		return
+	end
+	_lsp_redraw_pending = true
+	vim.schedule(function()
+		_lsp_redraw_pending = false
+		pcall(vim.cmd, 'redrawstatus')
+	end)
+end
+
+local function lsp_refresh_status()
+	local messages = {}
+	local max_percent = nil
+	for _, client_id in ipairs(_lsp_clients) do
+		local tokens = _lsp_active[client_id]
+		if tokens then
+			for _, token in pairs(tokens) do
+				local message = token.message and ((token.title or '') .. ': ' .. token.message) or token.title
+				if message then
+					messages[#messages + 1] = message
+				end
+				if token.percentage then
+					max_percent = math.max(max_percent or 0, token.percentage)
+				end
+			end
 		end
-		vim.schedule(function()
-			vim.cmd("redrawstatus")
-		end)
+	end
+	local message = table.concat(messages, ', ')
+	local new_status
+	if max_percent then
+		new_status = message ~= '' and string.format('%3d%%: %s', max_percent, message) or string.format('%3d%%', max_percent)
+	else
+		new_status = message
+	end
+	new_status = lsp_truncate(new_status):gsub('%%', '%%%%')
+	if new_status == _lsp_status then
+		return false
+	end
+	_lsp_status = new_status
+	return true
+end
+
+local function lsp_refresh_clients()
+	local ids = {}
+	local names = {}
+	for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+		ids[#ids + 1] = client.id
+		names[#names + 1] = client.name
+	end
+	local new_names = lsp_truncate(table.concat(names, '∙')):gsub('%%', '%%%%')
+	local new_attached = #ids > 0
+	local changed = new_names ~= _lsp_names or new_attached ~= _lsp_attached
+	_lsp_clients = ids
+	_lsp_names = new_names
+	_lsp_attached = new_attached
+	return changed
+end
+
+local function lsp_refresh_all()
+	local clients_changed = lsp_refresh_clients()
+	local status_changed = lsp_refresh_status()
+	return clients_changed or status_changed
+end
+
+vim.api.nvim_create_autocmd({ 'LspAttach', 'LspDetach', 'BufEnter', 'WinEnter' }, {
+	group = lsp_status_group,
+	callback = function(ev)
+		if ev.event == 'LspDetach' then
+			local client = vim.lsp.get_client_by_id(ev.data.client_id)
+			if not client or client:is_stopped() then
+				_lsp_active[ev.data.client_id] = nil
+			end
+		end
+		if lsp_refresh_all() then
+			lsp_schedule_redraw()
+		end
 	end,
 })
 
-vim.api.nvim_create_autocmd({ "LspAttach", "LspDetach" }, {
-	group = "Heirline",
-	callback = function()
-		vim.schedule(function()
-			vim.cmd("redrawstatus")
-		end)
-	end,
-})
-
--- ---------------------------------------------------------------------------
--- LSP active
--- ---------------------------------------------------------------------------
-local LSPActive = {
-	condition = conditions.lsp_attached,
-	init = function(self)
-		local clients = vim.lsp.get_clients({ bufnr = 0 })
-		if #clients == 0 then
-			self.lsp_str = ""
+vim.api.nvim_create_autocmd('LspProgress', {
+	group = lsp_status_group,
+	callback = function(ev)
+		local data = ev.data
+		local value = data.params.value
+		local client_id = data.client_id
+		local token_id = data.params.token
+		if token_id == nil then
 			return
 		end
-
-		-- Build lookup of buffer-local client IDs
-		local buf_clients = {}
-		for _, client in ipairs(clients) do
-			buf_clients[client.id] = client.name
+		local tokens = _lsp_active[client_id]
+		if not tokens then
+			tokens = {}
+			_lsp_active[client_id] = tokens
 		end
 
-		-- Show progress for first active buffer-local client
-		for client_id, p in pairs(_lsp_progress) do
-			if buf_clients[client_id] then
-				local msg = buf_clients[client_id]
-				if p.title ~= "" then
-					msg = msg .. " " .. p.title
-				end
-				if p.message ~= "" then
-					msg = msg .. " " .. p.message
-				end
-				if p.percentage then
-					msg = msg .. " " .. p.percentage .. "%"
-				end
-				if #msg > 40 then
-					msg = msg:sub(1, 37) .. "\u{2026}"
-				end
-				-- Escape '%' for statusline rendering (prevents E539)
-				msg = msg:gsub("%%", "%%%%")
-				self.lsp_str = " \u{f04cb} " .. msg
-				return
+		if value.kind == 'end' then
+			tokens[token_id] = nil
+			if next(tokens) == nil then
+				_lsp_active[client_id] = nil
+			end
+		else
+			local percentage = value.percentage
+			if type(percentage) == 'number' then
+				percentage = math.max(0, math.min(100, percentage))
+			else
+				percentage = nil
+			end
+			local token = tokens[token_id]
+			if token then
+				token.title = value.title
+				token.message = value.message
+				token.percentage = percentage
+			else
+				tokens[token_id] = {
+					title = value.title,
+					message = value.message,
+					percentage = percentage,
+				}
 			end
 		end
 
-		-- Idle — show attached client names
-		local names = {}
-		for _, client in ipairs(clients) do
-			names[#names + 1] = client.name
+		if lsp_refresh_status() then
+			lsp_schedule_redraw()
 		end
-		self.lsp_str = " \u{f04cb} " .. table.concat(names, "\u{2219}")
 	end,
-	update = {
-		"LspAttach",
-		"LspDetach",
-		"BufEnter",
-		"LspProgress",
-		callback = vim.schedule_wrap(function()
-			vim.cmd("redrawstatus")
-		end),
-	},
-	flexible = 3,
-	{
-		provider = function(self)
-			return self.lsp_str
-		end,
-	},
-	{ provider = " \u{f04cb} " },
-	{ provider = "" },
-	hl = { fg = "lavender", italic = true },
+})
+
+lsp_refresh_all()
+
+local LSPStatus = {
+	condition = function()
+		return _lsp_attached
+	end,
+	provider = function()
+		if _lsp_status ~= '' then
+			return ' \u{f04cb} ' .. _lsp_status
+		end
+		if _lsp_names ~= '' then
+			return ' \u{f04cb} ' .. _lsp_names
+		end
+		return ''
+	end,
+	hl = { fg = 'lavender', italic = true },
 }
 
 -- ---------------------------------------------------------------------------
@@ -699,7 +761,7 @@ local DefaultStatusline = {
 	Space,
 	Spell,
 	Paste,
-	LSPActive,
+	LSPStatus,
 	Separator,
 	RightInfoIsland,
 	Space,
