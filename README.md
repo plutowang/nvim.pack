@@ -8,7 +8,7 @@ A minimalist, declarative Neovim configuration built on **Neovim 0.12+'s native 
 
 ## Philosophy
 
-- **Zero-latency startup**: Only the colorscheme loads on the first frame (~18ms perceived interactive).
+- **Zero-latency startup**: Only the colorscheme loads on the first frame; see `nvim-pack bench` for measured startup.
 - **Declarative**: All plugin loading logic is centralized in `lua/plugins/init.lua`.
 - **On-demand**: Plugins load only when needed (events, keymaps, or deferred).
 - **No bloat**: No `lazy.nvim`, `packer.nvim`, or `paq-nvim` — uses native `:packadd`.
@@ -208,6 +208,13 @@ Note: the `chromium` cask is disabled (Gatekeeper, 2026-09-01) — use a signed 
 2. **Remove the registry entry**: Delete the corresponding entry from the `pack.setup` registry in `lua/plugins/init.lua` (the entry with `mod = '...'` that references the plugin in its `packadd` array).
 3. **Remove from disk**: Delete the plugin directory from `~/.local/share/nvim/site/pack/core/opt/<PluginName>`.
 4. **Clean the lock file** (optional but recommended): Remove the plugin entry from `nvim-pack-lock.json` to keep it in sync. If `vim.pack` auto-repairs it back on next startup, the plugin directory still exists on disk — remove that first, then the lock entry will stay removed.
+
+## Native 0.12 Features
+
+- **Diff**: `'diffopt'` uses `inline:word` and `algorithm:histogram`. codediff is independent; gitsigns derives its diff algorithm from `'diffopt'`.
+- **UI2**: `vim._core.ui2` is enabled when a UI is attached. `cmdheight=0` is used with ui2 and falls back to `1` in headless/CI. If messages or the cmdline overlap, set `cmdheight=1`.
+- **Borders**: `'winborder'` and `'pumborder'` are `rounded`; explicit plugin borders still win. The `nvim_open_win` shim now only applies `style='minimal'`.
+- **Folding**: native treesitter folds; `'foldtext'` is empty, so folded lines show the first line with syntax highlighting; no fold-text plugin.
 
 ## Known Pitfalls
 
