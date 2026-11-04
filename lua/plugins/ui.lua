@@ -69,6 +69,20 @@ function M.native()
   vim.keymap.set('n', '<leader>bO', native.bufdelete_other,      { desc = '[B]uffer Delete [O]thers' })
   vim.keymap.set('n', '<leader>ba', native.bufdelete_all,        { desc = '[B]uffer Delete [A]ll' })
 
+  -- Lock/unlock the current buffer for editing. 'modifiable' blocks edits and
+  -- 'readonly' flags writes; auto-save already skips either (core/autocmds.lua).
+  vim.keymap.set('n', '<leader>bl', function()
+    local buf = vim.api.nvim_get_current_buf()
+    if vim.bo[buf].buftype ~= '' then
+      vim.notify('Buffer lock: not a file buffer', vim.log.levels.WARN)
+      return
+    end
+    local was_editable = vim.bo[buf].modifiable
+    vim.bo[buf].modifiable = not was_editable
+    vim.bo[buf].readonly = was_editable
+    vim.notify(was_editable and 'Buffer locked' or 'Buffer unlocked', vim.log.levels.INFO)
+  end, { desc = '[B]uffer [L]ock/Unlock' })
+
   -- Terminal operations
   vim.keymap.set('n', '<leader>tf', native.terminal_float,       { desc = '[T]erminal [F]loat' })
   vim.keymap.set('n', '<leader>tp', function() native.terminal_repl('python3') end, { desc = '[T]erminal [P]ython REPL' })

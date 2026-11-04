@@ -40,7 +40,7 @@ nvim.pack/
 │       ├── debugging.lua    # DAP ecosystem
 │       ├── deferred.lua     # render-markdown, snacks.image, colorizer, guess-indent, todo-comments
 │       ├── editing.lua      # indent-blankline, rainbow-delimiters, conform
-│       ├── git.lua          # gitsigns, codediff
+│       ├── git.lua          # gitsigns, diffview
 │       ├── heirline.lua     # Statusline
 │       ├── lsp.lua          # LSP, Mason, lazydev
 │       ├── navigation.lua   # flash, spider
@@ -82,7 +82,7 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 | **BufReadPre**     | On file open             | Treesitter, LSP, rustaceanvim, gitsigns, treesitter-context, snacks image (mermaid, `*.md`) |
 | **InsertEnter**    | On first insert       | blink.cmp, autopairs                                    |
 | **BufWritePre**    | On save                  | conform.nvim (formatting)                           |
-| **Keymap**         | On first keypress        | Snacks picker, DAP, testing, database, codediff, opencode, trouble, productivity, surround, grug-far, treesj |
+| **Keymap**         | On first keypress        | Snacks picker, DAP, testing, database, diffview, opencode, trouble, productivity, surround, grug-far, treesj |
 | **Deferred**       | After 1ms idle           | render-markdown, colorizer, guess-indent, todo-comments |
 
 ## CLI Tool
@@ -211,7 +211,7 @@ Note: the `chromium` cask is disabled (Gatekeeper, 2026-09-01) — use a signed 
 
 ## Native 0.12 Features
 
-- **Diff**: `'diffopt'` uses `inline:word` and `algorithm:histogram`. codediff is independent; gitsigns derives its diff algorithm from `'diffopt'`.
+- **Diff**: `'diffopt'` uses `inline:word` and `algorithm:histogram`. diffview is independent; gitsigns derives its diff algorithm from `'diffopt'`.
 - **UI2**: `vim._core.ui2` is enabled when a UI is attached. `cmdheight=1` keeps the command line visible and the view stable; it remains `1` in headless/CI. If messages spill, increase it to `2`.
 - **Borders**: `'winborder'` and `'pumborder'` are `rounded`; explicit plugin borders still win. The `nvim_open_win` shim now only applies `style='minimal'`.
 - **Folding**: native treesitter folds; `'foldtext'` is empty, so folded lines show the first line with syntax highlighting; no fold-text plugin.

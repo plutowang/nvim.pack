@@ -38,7 +38,7 @@ vim.pack.add({
 
   -- Git
   'https://github.com/lewis6991/gitsigns.nvim',
-  'https://github.com/esmuellert/codediff.nvim',
+  'https://github.com/sindrets/diffview.nvim',
 
   -- Editing enhancements
   'https://github.com/windwp/nvim-autopairs',
@@ -221,7 +221,8 @@ pack.setup({
   { mod = 'git', fn = 'diff', keys = {
       { '<leader>hd',   desc = 'Git Diff against index' },
       { '<leader>hD',   desc = 'Git Diff Last Commit' },
-    }, packadd = { 'codediff.nvim' } },
+      { '<leader>hH',   desc = 'Git History of Current File' },
+    }, packadd = { 'diffview.nvim' } },
 
   { mod = 'tools', fn = 'diagnostics', keys = {
       { '<leader>xx',   desc = 'Diagnostics (Trouble)' },

@@ -85,6 +85,8 @@ vim.o.undofile = true
 vim.opt.undolevels = 10000
 vim.opt.history = 1000
 vim.opt.hidden = true
+-- Stack-style jumplist; keep Neovim's default "clean" (drop unloaded buffers).
+vim.opt.jumpoptions = 'stack,clean'
 
 -- =============================================================================
 -- Splits
