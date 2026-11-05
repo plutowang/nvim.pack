@@ -98,9 +98,6 @@ local function apply_theme(theme_config)
     },
     custom_highlights = function(colors)
       return {
-        CursorLine = { bg = colors.surface0 },
-        CursorColumn = { bg = colors.surface0 },
-        ColorColumn = { bg = colors.surface0 },
         WinSeparator = { fg = colors.surface2, bg = colors.base },
         Folded = { style = { 'italic', 'bold' } },
         LineNr = { fg = colors.overlay0 },

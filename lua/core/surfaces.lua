@@ -6,6 +6,7 @@ local M = {}
 local T1_STEP = { light = 0.035, dark = 0.045 } -- tier 1 off the canvas (math path only)
 local T2_STEP = 0.035 -- tier 2 off tier 1
 local SEL_STEP = 0.055 -- selection band off its surface
+local CURSORLINE_STEP = 0.02 -- cursor line off the canvas, deliberately below tier 1
 local BORDER_MIX = 0.22 -- surface -> separator blend for the hairline
 local THUMB_MIX = 0.35 -- scrollbar thumb off the surface
 local CR_MIN, CR_MAX = 1.02, 1.30 -- accepted subtlety band for a semantic tier 1
@@ -126,6 +127,7 @@ function M.derive()
   local border1 = mix(tier1, separator, BORDER_MIX)
   local border2 = mix(tier2, separator, BORDER_MIX)
   local thumb = mix(tier1, separator, THUMB_MIX)
+  local cursorline = step(canvas_bg, CURSORLINE_STEP)
 
   -- Title text uses the statusline NORMAL badge colour (heirline.lua:202).
   local title_bg = palette and parse_hex(palette.lavender) or accent
@@ -145,6 +147,7 @@ function M.derive()
     sel1 = to_hex(sel1),
     sel2 = to_hex(sel2),
     thumb = to_hex(thumb),
+    cursorline = to_hex(cursorline),
     title_bg = to_hex(title_bg),
   }
 end
@@ -185,6 +188,7 @@ function M.apply()
   local text, accent = parse_hex(d.text), parse_hex(d.accent)
   local muted, sep, thumb = parse_hex(d.muted), parse_hex(d.separator), parse_hex(d.thumb)
   local title_bg = parse_hex(d.title_bg)
+  local cursorline = parse_hex(d.cursorline)
 
   local set = vim.api.nvim_set_hl
 
@@ -206,6 +210,9 @@ function M.apply()
 
   set(0, 'FloatTitle', { bg = t1, fg = title_bg, bold = true })
   set(0, 'FloatFooter', { bg = t1, fg = muted, italic = true })
+  set(0, 'CursorLine', { bg = cursorline })
+  set(0, 'CursorColumn', { bg = cursorline })
+  set(0, 'ColorColumn', { bg = cursorline })
 
   for name, target in pairs(ALIASES) do
     set(0, name, { link = target })
