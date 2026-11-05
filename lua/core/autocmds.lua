@@ -110,8 +110,8 @@ end
 -- =============================================================================
 -- BUILD HOOKS (PackChanged)
 -- Run after vim.pack installs/updates a plugin.
--- Uses ev.data.spec.name, ev.data.kind, and ev.data.path directly per the
--- official vim.pack API — no glob path searching needed.
+-- Uses ev.data.spec.name and ev.data.kind directly per the official
+-- vim.pack API.
 -- =============================================================================
 
 vim.api.nvim_create_autocmd('PackChanged', {
@@ -119,7 +119,6 @@ vim.api.nvim_create_autocmd('PackChanged', {
   callback = function(ev)
     local name = ev.data.spec.name
     local kind = ev.data.kind  -- 'install' | 'update' | 'delete'
-    local path = ev.data.path  -- absolute path to the plugin directory
 
     if kind ~= 'install' and kind ~= 'update' then
       return
@@ -148,20 +147,23 @@ vim.api.nvim_create_autocmd('PackChanged', {
       end)
     end
 
-    -- blink.cmp: compile Rust fuzzy matching library
+    -- blink.cmp v2: build the Rust fuzzy matcher into lib/
     if name == 'blink.cmp' then
       if vim.fn.executable('cargo') == 0 then
+        vim.notify('blink.cmp: cargo not found; fuzzy matching will use Lua', vim.log.levels.WARN)
         return
       end
-      vim.system({ 'cargo', 'build', '--release' }, { cwd = path }, function(result)
-        if result.code ~= 0 then
-          vim.schedule(function()
-            vim.notify('blink.cmp Rust build failed:\n' .. (result.stderr or ''), vim.log.levels.ERROR)
-          end)
+      vim.schedule(function()
+        pcall(function() vim.cmd.packadd('blink.lib') end)
+        pcall(function() vim.cmd.packadd('blink.cmp') end)
+        local called, ok, err = pcall(function()
+          return require('blink.cmp').build():pwait()
+        end)
+        if called and ok then
+          vim.notify('blink.cmp Rust fuzzy library built', vim.log.levels.INFO)
         else
-          vim.schedule(function()
-            vim.notify('blink.cmp Rust fuzzy library built successfully', vim.log.levels.INFO)
-          end)
+          local msg = called and err or ok
+          vim.notify('blink.cmp Rust build failed: ' .. tostring(msg), vim.log.levels.ERROR)
         end
       end)
     end

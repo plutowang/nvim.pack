@@ -8,7 +8,7 @@ A minimalist, declarative Neovim configuration built on **Neovim 0.12+'s native 
 
 ## Philosophy
 
-- **Zero-latency startup**: Only the colorscheme loads on the first frame (~18ms perceived interactive).
+- **Zero-latency startup**: Only the colorscheme loads on the first frame; see `nvim-pack bench` for measured startup.
 - **Declarative**: All plugin loading logic is centralized in `lua/plugins/init.lua`.
 - **On-demand**: Plugins load only when needed (events, keymaps, or deferred).
 - **No bloat**: No `lazy.nvim`, `packer.nvim`, or `paq-nvim` — uses native `:packadd`.
@@ -32,15 +32,16 @@ nvim.pack/
 │   │   ├── keymaps.lua      # Global keymaps
 │   │   ├── native.lua       # Native replacements: lazygit, terminal, bufdelete, gitbrowse, scratch
 │   │   ├── options.lua      # Global options
-│   │   └── pack.lua         # The loading engine
+│   │   ├── pack.lua         # The loading engine
+│   │   └── surfaces.lua     # Derived float surfaces (3-tier elevation, ColorScheme hook)
 │   └── plugins/
 │       ├── init.lua         # Plugin declarations & loading registry
 │       ├── catppuccin.lua   # Theme (loaded immediately)
-│       ├── completion.lua   # blink.cmp
+│       ├── completion.lua   # blink.cmp (inline ghost text, 200ms docs)
 │       ├── debugging.lua    # DAP ecosystem
 │       ├── deferred.lua     # render-markdown, snacks.image, colorizer, guess-indent, todo-comments
 │       ├── editing.lua      # indent-blankline, rainbow-delimiters, conform
-│       ├── git.lua          # gitsigns, codediff
+│       ├── git.lua          # gitsigns, diffview
 │       ├── heirline.lua     # Statusline
 │       ├── lsp.lua          # LSP, Mason, lazydev
 │       ├── navigation.lua   # flash, spider
@@ -82,7 +83,7 @@ The engine (`lua/core/pack.lua`) processes a registry array. Each entry defines 
 | **BufReadPre**     | On file open             | Treesitter, LSP, rustaceanvim, gitsigns, treesitter-context, snacks image (mermaid, `*.md`) |
 | **InsertEnter**    | On first insert       | blink.cmp, autopairs                                    |
 | **BufWritePre**    | On save                  | conform.nvim (formatting)                           |
-| **Keymap**         | On first keypress        | Snacks picker, DAP, testing, database, codediff, opencode, trouble, productivity, surround, grug-far, treesj |
+| **Keymap**         | On first keypress        | Snacks picker, DAP, testing, database, diffview, opencode, trouble, productivity, surround, grug-far, treesj |
 | **Deferred**       | After 1ms idle           | render-markdown, colorizer, guess-indent, todo-comments |
 
 ## CLI Tool
@@ -209,12 +210,24 @@ Note: the `chromium` cask is disabled (Gatekeeper, 2026-09-01) — use a signed 
 3. **Remove from disk**: Delete the plugin directory from `~/.local/share/nvim/site/pack/core/opt/<PluginName>`.
 4. **Clean the lock file** (optional but recommended): Remove the plugin entry from `nvim-pack-lock.json` to keep it in sync. If `vim.pack` auto-repairs it back on next startup, the plugin directory still exists on disk — remove that first, then the lock entry will stay removed.
 
+## Native 0.12 Features
+
+- **Diff**: `'diffopt'` uses `inline:word` and `algorithm:histogram`. diffview is independent; gitsigns derives its diff algorithm from `'diffopt'`.
+- **UI2**: `vim._core.ui2` is enabled when a UI is attached. `cmdheight=1` keeps the command line visible and the view stable; it remains `1` in headless/CI. If messages spill, increase it to `2`.
+- **Borders**: `'winborder'` and `'pumborder'` are `rounded`; explicit plugin borders still win. The `nvim_open_win` shim now only applies `style='minimal'`.
+- **Surfaces**: `lua/core/surfaces.lua` derives three elevation tiers from the active palette on `ColorScheme` (semantic layer when it stays within a 1.02–1.30 contrast band, RGB math otherwise). Float, popup-menu, blink, which-key, trouble and snacks groups all resolve to those tiers; `FloatBorder.bg` is locked to `NormalFloat.bg` so no terminal cell bleeds through. Re-derivation costs ~0.7 ms and only runs on theme changes.
+- **Folding**: native treesitter folds; `'foldtext'` is empty, so folded lines show the first line with syntax highlighting; no fold-text plugin.
+- **Diagnostics**: `'virtual_lines.current_line'` shows diagnostics only under the cursor; severity underlines use the theme palette and inlay hints are unboxed italics. Custom Nerd Font signs remain.
+- **LSP progress**: `LspProgress` drives a native OSC 9;4 terminal progress bar. Ghostty resets an idle bar after ~15 s; there is no keepalive timer and no polling.
+- **Statusline**: an event-driven active-token cache drives an O(1) provider; idle client names remain visible; `WinEnter` keeps the global statusline in sync when switching windows.
+- **Canvas**: `'fillchars'` blanks `eob`/`fold`; split and float borders take their colour from `WinSeparator`/`FloatBorder`.
+
 ## Known Pitfalls
 
 1. **`packadd` Dependencies**: If a plugin requires another plugin to function, you MUST include the dependency in the `packadd` array of the registry entry.
 2. **`vim.ui.select` Overrides**: `snacks.picker` replaces `vim.ui.select` when `Snacks.setup` runs at `VimEnter`. Keep picker setup early; a shim that restores the original before calling it silently falls back to the built-in prompt.
 3. **Headless Mode**: The `core.pack` engine does NOT bypass lazy loading in headless mode. Trigger the specific event or keymap to load a plugin during a headless script.
-4. **Augroup Collisions**: The engine creates augroups named `'pack-' .. entry.mod .. '-' .. entry.fn`. Never manually create augroups with this naming scheme.
+4. **Augroup Collisions**: The engine names augroups `pack-<mod>` or `pack-<mod>-<fn>` — the `-<fn>` suffix is omitted when the entry has no `fn`. Never manually create augroups with this naming scheme.
 5. **Keymap Replay**: The engine's keymap trigger uses `nvim_feedkeys` to replay the initial keypress. Ensure the plugin's actual keymap exactly matches the trigger keymap.
 6. **Event-Driven Module Setup**: Plugins that set up submodules on events (e.g., snacks.nvim `image` on `BufReadPre`) miss the in-flight event when loaded lazily *during* that event. Run the module setup explicitly after `setup()` — see `snacks.image.setup()` in `M.images()` (`lua/plugins/deferred.lua`).
 

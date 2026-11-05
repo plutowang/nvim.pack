@@ -24,9 +24,9 @@ vim.pack.add({
   'https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim',
   'https://github.com/folke/lazydev.nvim',
 
-  -- Completion
-  -- Pin to the 1.x line: v2 is a breaking rewrite on `main` (requires blink.lib).
-  { src = 'https://github.com/saghen/blink.cmp', version = vim.version.range('1.*') },
+  -- Completion (blink.cmp v2 tracks main; the lock pins the exact rev)
+  'https://github.com/saghen/blink.lib',
+  { src = 'https://github.com/saghen/blink.cmp', version = 'main' },
 
   -- Formatting
   'https://github.com/stevearc/conform.nvim',
@@ -38,7 +38,7 @@ vim.pack.add({
 
   -- Git
   'https://github.com/lewis6991/gitsigns.nvim',
-  'https://github.com/esmuellert/codediff.nvim',
+  'https://github.com/sindrets/diffview.nvim',
 
   -- Editing enhancements
   'https://github.com/windwp/nvim-autopairs',
@@ -159,7 +159,7 @@ pack.setup({
   -- -------------------------------------------------------------------------
   -- InsertEnter / CmdlineEnter (completion)
   -- -------------------------------------------------------------------------
-  { mod = 'completion', event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'blink.cmp' } },
+  { mod = 'completion', event = { 'InsertEnter', 'CmdlineEnter' }, packadd = { 'lazydev.nvim', 'blink.lib', 'blink.cmp' } },
 
   -- -------------------------------------------------------------------------
   -- BufWritePre (formatting on save — conform has its own internal guard)
@@ -221,7 +221,9 @@ pack.setup({
   { mod = 'git', fn = 'diff', keys = {
       { '<leader>hd',   desc = 'Git Diff against index' },
       { '<leader>hD',   desc = 'Git Diff Last Commit' },
-    }, packadd = { 'codediff.nvim' } },
+      { '<leader>hH',   desc = 'Git History of Current File' },
+      { '<leader>hm',   desc = 'Git Diff vs Latest origin/main' },
+    }, packadd = { 'diffview.nvim' } },
 
   { mod = 'tools', fn = 'diagnostics', keys = {
       { '<leader>xx',   desc = 'Diagnostics (Trouble)' },

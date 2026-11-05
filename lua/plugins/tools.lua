@@ -128,7 +128,7 @@ function M.diagnostics()
           type = 'float',
           relative = 'editor',
           border = 'rounded',
-          title = 'Preview',
+          title = ' Preview ',
           title_pos = 'center',
           position = { 0, -2 },
           size = { width = 0.3, height = 0.3 },
@@ -150,7 +150,7 @@ function M.diagnostics()
     multiline = true,
     indent_lines = true,
     win_config = {
-      border = 'single',
+      border = 'rounded',
     },
     auto_open = false,
     auto_close = false,

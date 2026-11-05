@@ -2,6 +2,13 @@
 -- LSP Configuration
 -- =============================================================================
 
+-- Neovim adds no title padding, so include it.
+--- @param text string
+--- @return string
+local function float_title(text)
+  return ' ' .. text .. ' '
+end
+
 -- lazydev: configure Lua LSP for Neovim config/plugin development
 require('lazydev').setup {
   library = {
@@ -37,6 +44,29 @@ vim.api.nvim_create_autocmd('LspAttach', {
     map('gO', snacks_picker('lsp_symbols'), 'Open Document Symbols')
     map('gW', snacks_picker('lsp_workspace_symbols'), 'Open Workspace Symbols')
     map('grt', snacks_picker('lsp_type_definitions', { auto_confirm = false }), '[G]oto [T]ype Definition')
+
+    -- Native floats routed through vim.lsp.buf.* opts (vim.lsp.with is deprecated).
+    map('K', function()
+      vim.lsp.buf.hover {
+        border = 'rounded',
+        title = float_title('Documentation'),
+        title_pos = 'center',
+        max_width = 80,
+        max_height = 20,
+      }
+    end, 'Hover Documentation')
+
+    -- <C-s> is Neovim's global default (defaults.lua:251); this buffer-local map
+    -- shadows it to add float options, keeping the same key.
+    map('<C-s>', function()
+      vim.lsp.buf.signature_help {
+        border = 'rounded',
+        title = float_title('Signature'),
+        title_pos = 'center',
+        max_width = 80,
+        max_height = 10,
+      }
+    end, 'Signature Help', 'i')
 
     local client = vim.lsp.get_client_by_id(event.data.client_id)
 
@@ -97,8 +127,17 @@ vim.api.nvim_create_autocmd('InsertLeave', {
 -- Diagnostic display config
 vim.diagnostic.config {
   severity_sort = true,
-  float = { border = 'rounded', source = 'if_many' },
-  underline = { severity = vim.diagnostic.severity.ERROR },
+  float = {
+    border = 'rounded',
+    source = 'if_many',
+    header = '',
+    prefix = '',
+    title = float_title('Diagnostics'),
+    title_pos = 'center',
+    max_width = 80,
+    max_height = 20,
+  },
+  underline = true,
   signs = vim.g.have_nerd_font and {
     text = {
       [vim.diagnostic.severity.ERROR] = '󰅚 ',
@@ -107,14 +146,124 @@ vim.diagnostic.config {
       [vim.diagnostic.severity.HINT] = '󰌶 ',
     },
   } or {},
-  virtual_text = {
-    source = 'if_many',
-    spacing = 2,
-    format = function(diagnostic)
-      return diagnostic.message
-    end,
-  },
+  virtual_text = false,
+  virtual_lines = { current_line = true },
+  update_in_insert = false,
 }
+
+-- LSP progress -> native terminal progress (OSC 9;4).
+-- LSP emits LspProgress, not Progress; bridge directly to the terminal.
+if vim.fn.has('nvim-0.12') == 1 then
+  local group = vim.api.nvim_create_augroup('nvimpack-lsp-progress', { clear = true })
+  local active = {} ---@type table<integer, table<string|integer, { percentage?: integer }>>
+  local has_ui = #vim.api.nvim_list_uis() > 0
+  local last_osc = nil
+
+  local function send_osc(seq)
+    if not has_ui or seq == last_osc then
+      return
+    end
+    if pcall(vim.api.nvim_ui_send, seq) then
+      last_osc = seq
+    end
+  end
+
+  local function recompute()
+    local max_percent = nil
+    local any = false
+    for _, tokens in pairs(active) do
+      for _, token in pairs(tokens) do
+        any = true
+        if token.percentage then
+          max_percent = math.max(max_percent or 0, token.percentage)
+        end
+      end
+    end
+
+    if not any then
+      send_osc('\027]9;4;0;0\027\\')
+    elseif max_percent then
+      send_osc(string.format('\027]9;4;1;%d\027\\', max_percent))
+    else
+      send_osc('\027]9;4;3\027\\')
+    end
+  end
+
+  local function sync_ui()
+    has_ui = #vim.api.nvim_list_uis() > 0
+    last_osc = nil
+    recompute()
+  end
+
+  vim.api.nvim_create_autocmd('UIEnter', {
+    group = group,
+    callback = sync_ui,
+  })
+
+  vim.api.nvim_create_autocmd('UILeave', {
+    group = group,
+    callback = sync_ui,
+  })
+
+  vim.api.nvim_create_autocmd('LspProgress', {
+    group = group,
+    callback = function(ev)
+      local data = ev.data
+      local value = data.params.value
+      local client_id = data.client_id
+      local token_id = data.params.token
+      if token_id == nil then
+        return
+      end
+      local tokens = active[client_id]
+      if not tokens then
+        tokens = {}
+        active[client_id] = tokens
+      end
+
+      if value.kind == 'end' then
+        tokens[token_id] = nil
+        if next(tokens) == nil then
+          active[client_id] = nil
+        end
+      else
+        local percentage = value.percentage
+        if type(percentage) == 'number' then
+          percentage = math.max(0, math.min(100, percentage))
+        else
+          percentage = nil
+        end
+        local token = tokens[token_id]
+        if token then
+          token.percentage = percentage
+        else
+          tokens[token_id] = { percentage = percentage }
+        end
+      end
+
+      recompute()
+    end,
+  })
+
+  vim.api.nvim_create_autocmd('LspDetach', {
+    group = group,
+    callback = function(ev)
+      local client = vim.lsp.get_client_by_id(ev.data.client_id)
+      if not client or client:is_stopped() then
+        active[ev.data.client_id] = nil
+        recompute()
+      end
+    end,
+  })
+
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    group = group,
+    callback = function()
+      last_osc = nil
+      send_osc('\027]9;4;0;0\027\\')
+    end,
+  })
+end
 
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities.textDocument.completion.completionItem.snippetSupport = true

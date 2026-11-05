@@ -39,9 +39,27 @@ vim.o.cursorline = true
 vim.o.signcolumn = 'yes'
 vim.o.termguicolors = true
 vim.o.laststatus = 3
-vim.opt.pumblend = 20
-vim.opt.winblend = 20
+vim.opt.pumblend = 10
+vim.opt.winblend = 10
 vim.opt.smoothscroll = true
+-- 0.12+ features; has() is a floor, so this remains active on 0.13+.
+if vim.fn.has('nvim-0.12') == 1 then
+  pcall(function() vim.o.winborder = 'rounded' end)
+  pcall(function() vim.o.pumborder = 'rounded' end)
+end
+
+-- =============================================================================
+-- Canvas
+-- =============================================================================
+-- No end-of-buffer marker, no fold filler dots. Separator glyphs are already
+-- Neovim's defaults; listed so the canvas has a single owner.
+vim.opt.fillchars = {
+  eob = ' ',
+  fold = ' ',
+  vert = '│',
+  horiz = '─',
+  foldsep = '│',
+}
 
 -- =============================================================================
 -- Editing
@@ -80,6 +98,8 @@ vim.o.undofile = true
 vim.opt.undolevels = 10000
 vim.opt.history = 1000
 vim.opt.hidden = true
+-- Stack-style jumplist; keep Neovim's default "clean" (drop unloaded buffers).
+vim.opt.jumpoptions = 'stack,clean'
 
 -- =============================================================================
 -- Splits
@@ -92,10 +112,28 @@ vim.o.splitbelow = true
 -- =============================================================================
 vim.o.foldmethod = 'expr'
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+if vim.fn.has('nvim-0.12') == 1 then
+  vim.opt.foldtext = ''
+end
 vim.o.foldlevel = 99
 vim.o.foldlevelstart = 99
 vim.o.foldenable = true
 vim.opt.foldnestmax = 3
+
+-- =============================================================================
+-- Diff
+-- =============================================================================
+if vim.fn.has('nvim-0.12') == 1 then
+  vim.opt.diffopt = {
+    'internal',
+    'filler',
+    'closeoff',
+    'indent-heuristic',
+    'inline:word',
+    'algorithm:histogram',
+    'linematch:40',
+  }
+end
 
 -- =============================================================================
 -- Completion
@@ -114,13 +152,41 @@ vim.filetype.add {
 }
 
 -- =============================================================================
--- Rounded borders for all floating windows
+-- Minimal chrome for all floating windows
+-- Borders come from 'winborder' or the plugin's explicit border.
 -- =============================================================================
 local orig_open_win = vim.api.nvim_open_win
 vim.api.nvim_open_win = function(buffer, enter, config)
-  if config and config.relative then
-    config.border = config.border or 'rounded'
-    if not config.style then config.style = 'minimal' end
+  if config and config.relative and not config.style then
+    config.style = 'minimal'
   end
   return orig_open_win(buffer, enter, config)
 end
+
+local ui2_active = false
+if vim.fn.has('nvim-0.12') == 1 then
+  local function enable_ui2()
+    local ok = pcall(function()
+      require('vim._core.ui2').enable()
+    end)
+    ui2_active = ok and #vim.api.nvim_list_uis() > 0
+    return ui2_active
+  end
+
+  ui2_active = enable_ui2()
+  if not ui2_active then
+    vim.api.nvim_create_autocmd('UIEnter', {
+      once = true,
+      callback = function()
+        enable_ui2()
+      end,
+    })
+  end
+end
+
+-- Keep one command-line row visible at all times; 'cmdheight' is tabpage-local.
+local function set_cmdheight()
+  vim.o.cmdheight = 1
+end
+set_cmdheight()
+vim.api.nvim_create_autocmd('TabEnter', { callback = set_cmdheight })

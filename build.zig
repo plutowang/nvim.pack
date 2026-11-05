@@ -26,9 +26,7 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the nvim-pack CLI tool");
     run_step.dependOn(&run_cmd.step);
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,

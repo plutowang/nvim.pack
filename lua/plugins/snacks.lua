@@ -89,6 +89,10 @@ function M.setup()
     { desc = '[S]earch Recent Files ("." for repeat)' })
   vim.keymap.set('n', '<leader>sg', function() snacks.picker.grep({ live = true, regex = false, args = grep_args() }) end,
     { desc = '[S]earch by [G]rep (literal, <a-r> regex)' })
+  vim.keymap.set('n', '<leader>sl', function() snacks.picker.git_log() end,
+    { desc = '[S]earch Git [L]og' })
+  vim.keymap.set('n', '<leader>sL', function() snacks.picker.git_log_file() end,
+    { desc = '[S]earch Git Log Current Fi[L]e' })
   vim.keymap.set('n', '<leader>s/', function() snacks.picker.grep_buffers({ need_search = true }) end,
     { desc = '[S]earch [/] in Open Files' })
   vim.keymap.set('n', '<leader>sn', function() snacks.picker.files({ cwd = vim.fn.stdpath('config') }) end,
