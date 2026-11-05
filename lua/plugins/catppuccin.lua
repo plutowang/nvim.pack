@@ -55,6 +55,93 @@ local theme_colors = {
 
 _G.theme_colors = theme_colors
 
+local lsp_styles = {
+  inlay_hints = { background = false },
+}
+
+--- Single source of truth for catppuccin options. Used at startup and on toggle.
+--- @param theme_config table
+local function apply_theme(theme_config)
+  require('catppuccin').setup {
+    flavour = theme_config.flavour,
+    term_colors = false,
+    lsp_styles = lsp_styles,
+    dim_inactive = {
+      enabled = true,
+      shade = theme_config.background == 'light' and 'light' or 'dark',
+      percentage = 0.12,
+    },
+    color_overrides = theme_config.color_overrides,
+    styles = {
+      comments = { 'italic' },
+      conditionals = { 'italic' },
+      functions = { 'bold' },
+      keywords = { 'bold' },
+      types = { 'italic' },
+    },
+    integrations = {
+      cmp = true,
+      gitsigns = true,
+      treesitter = true,
+      treesitter_context = true,
+      notify = true,
+      mason = true,
+      snacks = true,
+      which_key = true,
+      flash = true,
+      lsp_trouble = true,
+      indent_blankline = { enabled = true, scope_color = 'lavender' },
+      dap = { enabled = true, enable_ui = true },
+      render_markdown = true,
+      blink_cmp = true,
+      neotest = true,
+    },
+    custom_highlights = function(colors)
+      return {
+        CursorLine = { bg = colors.surface0 },
+        CursorColumn = { bg = colors.surface0 },
+        ColorColumn = { bg = colors.surface0 },
+        WinSeparator = { fg = colors.surface2, bg = colors.base },
+        Folded = { style = { 'italic', 'bold' } },
+        LineNr = { fg = colors.overlay0 },
+        CursorLineNr = { fg = colors.mauve, style = { 'bold' } },
+        Visual = { bg = colors.surface1, style = {} },
+        MatchParen = { fg = colors.peach, bg = colors.none, style = { 'bold', 'underline' } },
+        LspInlayHint = { fg = colors.overlay0, style = { 'italic' } },
+        GitSignsUntracked = { fg = colors.overlay1 },
+        BlinkCmpGhostText = { fg = colors.overlay0, style = { 'italic' } },
+        DiagnosticHint = { fg = colors.teal },
+        IblIndent = { fg = colors.surface0 },
+        IblScope = { fg = colors.surface2 },
+        LspReferenceText = { bg = colors.surface1, style = { 'bold' } },
+        LspReferenceRead = { bg = colors.surface1, style = { 'bold' } },
+        LspReferenceWrite = { bg = colors.peach, fg = colors.base, style = { 'bold' } },
+        WhichKey = { fg = colors.lavender, style = { 'bold' } },
+        WhichKeyGroup = { fg = colors.lavender },
+        WhichKeyDesc = { fg = colors.lavender },
+        WhichKeySeparator = { fg = colors.overlay1 },
+        MasonNormal = { bg = colors.mantle, fg = colors.text, blend = 10 },
+        MasonHeader = { bg = colors.blue, fg = colors.mantle, style = { 'bold' } },
+        MasonHeaderSecondary = { bg = colors.lavender, fg = colors.mantle, style = { 'bold' } },
+        MasonHighlight = { fg = colors.blue },
+        MasonHighlightBlock = { bg = colors.blue, fg = colors.mantle },
+        MasonHighlightBlockBold = { bg = colors.blue, fg = colors.mantle, style = { 'bold' } },
+        MasonHighlightSecondary = { fg = colors.lavender },
+        MasonHighlightBlockSecondary = { bg = colors.lavender, fg = colors.mantle },
+        MasonHighlightBlockBoldSecondary = { bg = colors.lavender, fg = colors.mantle, style = { 'bold' } },
+        MasonMuted = { fg = colors.overlay1 },
+        MasonMutedBlock = { bg = colors.overlay1, fg = colors.mantle },
+        MasonMutedBlockBold = { bg = colors.overlay1, fg = colors.mantle, style = { 'bold' } },
+        ['@variable.angular'] = { fg = colors.mauve, style = { 'italic' } },
+        NeotestPassed = { fg = colors.green, style = { 'bold' } },
+        NeotestFailed = { fg = colors.red, style = { 'bold' } },
+        NeotestRunning = { fg = colors.yellow, style = { 'bold' } },
+        NeotestSkipped = { fg = colors.blue, style = { 'bold' } },
+      }
+    end,
+  }
+end
+
 local function toggle_between_themes()
   local current = get_active_theme_name()
   local new_theme = current == 'latte' and 'nge' or 'latte'
@@ -62,12 +149,7 @@ local function toggle_between_themes()
 
   local theme_config = themes[new_theme]
   vim.opt.background = theme_config.background
-
-  require('catppuccin').setup {
-    flavour = theme_config.flavour,
-    term_colors = false,
-    color_overrides = theme_config.color_overrides,
-  }
+  apply_theme(theme_config)
 
   vim.cmd('colorscheme catppuccin')
 
@@ -105,92 +187,12 @@ local theme_config = themes[current_theme]
 
 vim.opt.background = theme_config.background
 
-require('catppuccin').setup {
-  flavour = theme_config.flavour,
-  term_colors = false,
-  dim_inactive = {
-    enabled = true,
-    shade = current_theme == 'latte' and 'light' or 'dark',
-    percentage = 0.12,
-  },
-  color_overrides = theme_config.color_overrides,
-  styles = {
-    comments = { 'italic' },
-    conditionals = { 'italic' },
-    functions = { 'bold' },
-    keywords = { 'bold' },
-    types = { 'italic' },
-  },
-  integrations = {
-    cmp = true,
-    gitsigns = true,
-    treesitter = true,
-    treesitter_context = true,
-    notify = true,
-    mason = true,
-    snacks = true,
-    which_key = true,
-    flash = true,
-    lsp_trouble = true,
-    indent_blankline = { enabled = true, scope_color = 'lavender' },
-    dap = { enabled = true, enable_ui = true },
-    render_markdown = true,
-    blink_cmp = true,
-    neotest = true,
-  },
-  custom_highlights = function(colors)
-    return {
-      CursorLine = { bg = colors.surface0 },
-      CursorColumn = { bg = colors.surface0 },
-      ColorColumn = { bg = colors.surface0 },
-      WinSeparator = { fg = colors.overlay0, bg = colors.base },
-      Folded = { style = { 'italic', 'bold' } },
-      LineNr = { fg = colors.overlay0 },
-      CursorLineNr = { fg = colors.mauve, style = { 'bold' } },
-      NormalFloat = { bg = colors.mantle, fg = colors.text, blend = 10 },
-      FloatBorder = { bg = colors.mantle, fg = colors.overlay0, blend = 8 },
-      FloatTitle = { bg = colors.mantle, fg = colors.lavender, style = { 'bold' }, blend = 8 },
-      FloatFooter = { bg = colors.mantle, fg = colors.overlay0, style = { 'italic' }, blend = 8 },
-      DiagnosticHint = { fg = colors.teal },
-      IblIndent = { fg = colors.surface0 },
-      IblScope = { fg = colors.surface2 },
-      CmpMenu = { bg = colors.mantle, fg = colors.text, blend = 10 },
-      CmpMenuBorder = { bg = colors.mantle, fg = colors.overlay0, blend = 8 },
-      CmpMenuSel = { bg = colors.surface0, fg = colors.text, style = { 'bold' } },
-      CmpDocumentation = { bg = colors.mantle, fg = colors.text, blend = 10 },
-      CmpDocumentationBorder = { bg = colors.mantle, fg = colors.overlay0, blend = 8 },
-      CmpDocumentationCursorLine = { bg = colors.surface0 },
-      CmpSignatureHelp = { bg = colors.mantle, fg = colors.text, blend = 10 },
-      CmpSignatureHelpBorder = { bg = colors.mantle, fg = colors.overlay0, blend = 8 },
-      LspReferenceText = { bg = colors.surface1, style = { 'bold' } },
-      LspReferenceRead = { bg = colors.surface1, style = { 'bold' } },
-      LspReferenceWrite = { bg = colors.peach, fg = colors.base, style = { 'bold' } },
-      WhichKey = { fg = colors.lavender, style = { 'bold' } },
-      WhichKeyGroup = { fg = colors.lavender },
-      WhichKeyDesc = { fg = colors.lavender },
-      WhichKeySeparator = { fg = colors.overlay1 },
-      WhichKeyFloat = { bg = colors.mantle, blend = 10 },
-      WhichKeyBorder = { bg = colors.mantle, fg = colors.overlay0, blend = 8 },
-      MasonNormal = { bg = colors.mantle, fg = colors.text, blend = 10 },
-      MasonHeader = { bg = colors.blue, fg = colors.mantle, style = { 'bold' } },
-      MasonHeaderSecondary = { bg = colors.lavender, fg = colors.mantle, style = { 'bold' } },
-      MasonHighlight = { fg = colors.blue },
-      MasonHighlightBlock = { bg = colors.blue, fg = colors.mantle },
-      MasonHighlightBlockBold = { bg = colors.blue, fg = colors.mantle, style = { 'bold' } },
-      MasonHighlightSecondary = { fg = colors.lavender },
-      MasonHighlightBlockSecondary = { bg = colors.lavender, fg = colors.mantle },
-      MasonHighlightBlockBoldSecondary = { bg = colors.lavender, fg = colors.mantle, style = { 'bold' } },
-      MasonMuted = { fg = colors.overlay1 },
-      MasonMutedBlock = { bg = colors.overlay1, fg = colors.mantle },
-      MasonMutedBlockBold = { bg = colors.overlay1, fg = colors.mantle, style = { 'bold' } },
-      ['@variable.angular'] = { fg = colors.mauve, style = { 'italic' } },
-      NeotestPassed = { fg = colors.green, style = { 'bold' } },
-      NeotestFailed = { fg = colors.red, style = { 'bold' } },
-      NeotestRunning = { fg = colors.yellow, style = { 'bold' } },
-      NeotestSkipped = { fg = colors.blue, style = { 'bold' } },
-    }
-  end,
-}
+apply_theme(theme_config)
+
+-- Derive float surfaces from the palette we just configured. Registration only:
+-- the `colorscheme` command below fires the first (and only) derivation.
+require('core.surfaces').attach()
+
 vim.cmd.colorscheme 'catppuccin'
 
 -- Terminal color palette — Catppuccin Latte (light-background compatible)

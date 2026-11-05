@@ -39,14 +39,27 @@ vim.o.cursorline = true
 vim.o.signcolumn = 'yes'
 vim.o.termguicolors = true
 vim.o.laststatus = 3
-vim.opt.pumblend = 20
-vim.opt.winblend = 20
+vim.opt.pumblend = 10
+vim.opt.winblend = 10
 vim.opt.smoothscroll = true
 -- 0.12+ features; has() is a floor, so this remains active on 0.13+.
 if vim.fn.has('nvim-0.12') == 1 then
   pcall(function() vim.o.winborder = 'rounded' end)
   pcall(function() vim.o.pumborder = 'rounded' end)
 end
+
+-- =============================================================================
+-- Canvas
+-- =============================================================================
+-- No end-of-buffer marker, no fold filler dots. Separator glyphs are already
+-- Neovim's defaults; listed so the canvas has a single owner.
+vim.opt.fillchars = {
+  eob = ' ',
+  fold = ' ',
+  vert = '│',
+  horiz = '─',
+  foldsep = '│',
+}
 
 -- =============================================================================
 -- Editing

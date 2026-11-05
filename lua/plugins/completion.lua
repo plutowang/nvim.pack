@@ -40,12 +40,17 @@ require("blink.cmp").setup({
 	},
 
 	completion = {
+		ghost_text = {
+			enabled = true,
+			show_without_selection = true,
+		},
 		documentation = {
 			auto_show = true,
 			auto_show_delay_ms = 500,
 			window = {
 				border = "rounded",
-				winhighlight = "Normal:CmpDocumentation,FloatBorder:CmpDocumentationBorder,CursorLine:CmpDocumentationCursorLine,Search:None,CurSearch:None",
+				-- unset on purpose: blink's default maps BlinkCmpDoc* and keeps Search:None
+				winblend = 10,
 				scrollbar = true,
 				max_width = 80,
 				max_height = 20,
@@ -53,7 +58,8 @@ require("blink.cmp").setup({
 		},
 		menu = {
 			border = "rounded",
-			winhighlight = "Normal:CmpMenu,FloatBorder:CmpMenuBorder,CursorLine:PmenuSel,Search:None,CurSearch:None",
+			-- unset on purpose: blink's default maps BlinkCmpMenu* and keeps Search:None
+			winblend = 10,
 			max_height = 15,
 			scrolloff = 2,
 			scrollbar = true,

@@ -2,6 +2,11 @@ local M = {}
 
 function M.which_key()
   require('which-key').setup {
+    win = {
+      border = 'rounded',
+      title = true,
+      title_pos = 'left',
+    },
     delay = 200,
     icons = {
       mappings = vim.g.have_nerd_font,

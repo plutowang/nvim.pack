@@ -2,6 +2,13 @@
 -- LSP Configuration
 -- =============================================================================
 
+-- Neovim adds no title padding, so include it.
+--- @param text string
+--- @return string
+local function float_title(text)
+  return ' ' .. text .. ' '
+end
+
 -- lazydev: configure Lua LSP for Neovim config/plugin development
 require('lazydev').setup {
   library = {
@@ -37,6 +44,29 @@ vim.api.nvim_create_autocmd('LspAttach', {
     map('gO', snacks_picker('lsp_symbols'), 'Open Document Symbols')
     map('gW', snacks_picker('lsp_workspace_symbols'), 'Open Workspace Symbols')
     map('grt', snacks_picker('lsp_type_definitions', { auto_confirm = false }), '[G]oto [T]ype Definition')
+
+    -- Native floats routed through vim.lsp.buf.* opts (vim.lsp.with is deprecated).
+    map('K', function()
+      vim.lsp.buf.hover {
+        border = 'rounded',
+        title = float_title('Documentation'),
+        title_pos = 'center',
+        max_width = 80,
+        max_height = 20,
+      }
+    end, 'Hover Documentation')
+
+    -- <C-s> is Neovim's global default (defaults.lua:251); this buffer-local map
+    -- shadows it to add float options, keeping the same key.
+    map('<C-s>', function()
+      vim.lsp.buf.signature_help {
+        border = 'rounded',
+        title = float_title('Signature'),
+        title_pos = 'center',
+        max_width = 80,
+        max_height = 10,
+      }
+    end, 'Signature Help', 'i')
 
     local client = vim.lsp.get_client_by_id(event.data.client_id)
 
@@ -102,6 +132,10 @@ vim.diagnostic.config {
     source = 'if_many',
     header = '',
     prefix = '',
+    title = float_title('Diagnostics'),
+    title_pos = 'center',
+    max_width = 80,
+    max_height = 20,
   },
   underline = true,
   signs = vim.g.have_nerd_font and {

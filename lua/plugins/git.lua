@@ -6,11 +6,12 @@ function M.signs()
 
   gitsigns.setup({
     signs = {
-      add = { text = '+' },
-      change = { text = '~' },
-      delete = { text = '_' },
-      topdelete = { text = '‾' },
-      changedelete = { text = '~' },
+      add = { text = '╎' },
+      change = { text = '╎' },
+      delete = { text = '╴' },
+      topdelete = { text = '▔' },
+      changedelete = { text = '╎' },
+      untracked = { text = '┆' },
     },
     on_attach = function(bufnr)
       local function map(mode, l, r, opts)
@@ -92,6 +93,25 @@ function M.diff()
   vim.keymap.set('n', '<leader>hd', '<cmd>DiffviewOpen<cr>', { desc = 'Git [d]iff against index' })
   vim.keymap.set('n', '<leader>hD', '<cmd>DiffviewOpen HEAD~1<cr>', { desc = 'Git [D]iff against last commit' })
   vim.keymap.set('n', '<leader>hH', '<cmd>DiffviewFileHistory %<cr>', { desc = 'Git [H]istory of current file' })
+
+  -- Fetch first so "origin/main" means the latest remote tip, then diff from the
+  -- merge-base to HEAD (triple-dot): what this branch changed, without showing
+  -- main's own new commits as reversals. Async, so the editor never blocks.
+  vim.keymap.set('n', '<leader>hm', function()
+    vim.system({ 'git', 'fetch', '--quiet', 'origin', 'main' }, { text = true }, function(out)
+      vim.schedule(function()
+        if out.code ~= 0 then
+          local err = vim.trim(out.stderr or '')
+          vim.notify(
+            'git fetch origin main failed: ' .. (err ~= '' and err or 'unknown error'),
+            vim.log.levels.ERROR
+          )
+          return
+        end
+        vim.cmd('DiffviewOpen origin/main...HEAD')
+      end)
+    end)
+  end, { desc = 'Git diff vs latest origin/[m]ain' })
 end
 
 return M

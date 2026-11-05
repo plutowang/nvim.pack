@@ -222,6 +222,7 @@ pack.setup({
       { '<leader>hd',   desc = 'Git Diff against index' },
       { '<leader>hD',   desc = 'Git Diff Last Commit' },
       { '<leader>hH',   desc = 'Git History of Current File' },
+      { '<leader>hm',   desc = 'Git Diff vs Latest origin/main' },
     }, packadd = { 'diffview.nvim' } },
 
   { mod = 'tools', fn = 'diagnostics', keys = {
